@@ -49,7 +49,7 @@ export default function Register() {
   };
 
   return (
-    <section className="bg-gray-100 min-h-screen py-10">
+    <section className="bg-gray-100  py-10">
       <div className="max-w-4xl mx-auto px-4">
         <h2 className="text-lg font-semibold border-b-2 border-orange-600 pb-2 mb-8">
           ĐĂNG KÝ TÀI KHOẢN
