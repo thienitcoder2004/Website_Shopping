@@ -216,7 +216,7 @@ export default function Header() {
             KHUYẾN MẠI
           </Link>
 
-          <Link to="/news" className={isActive("/news")}>
+          <Link to="/new" className={isActive("/new")}>
             TIN TỨC
           </Link>
 
@@ -245,7 +245,7 @@ export default function Header() {
             <Link to="/sale" onClick={() => setOpen(false)}>
               KHUYẾN MẠI
             </Link>
-            <Link to="/news" onClick={() => setOpen(false)}>
+            <Link to="/new" onClick={() => setOpen(false)}>
               TIN TỨC
             </Link>
             <Link to="/contact" onClick={() => setOpen(false)}>
