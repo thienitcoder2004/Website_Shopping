@@ -8,6 +8,8 @@ import {
   ShoppingCart,
   BarChart3,
   LogOut,
+  Newspaper,
+  PhoneCall,
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { logout } from "../stores/authSlice";
@@ -31,6 +33,16 @@ export default function AdminLayout() {
       name: "Đơn hàng",
       icon: <ShoppingCart size={18} />,
       path: "/admin/orders",
+    },
+    {
+      name: "Tin tức",
+      icon: <Newspaper size={18} />,
+      path: "/admin/news",
+    },
+    {
+      name: "Liên hệ",
+      icon: <PhoneCall size={18} />,
+      path: "/admin/contacts",
     },
     {
       name: "Thống kê",

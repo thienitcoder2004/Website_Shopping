@@ -25,6 +25,11 @@ const userSchema = new mongoose.Schema(
             default: "",
         },
 
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+
         resetToken: String,
         resetTokenExpire: Date,
     },

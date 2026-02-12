@@ -1,8 +1,29 @@
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import axios from "axios";
 import type { RootState } from "../../stores/store";
 
 export default function AdminDashboard() {
   const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
+
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+  });
+
+  const fetchStats = async () => {
+    const res = await axios.get("http://localhost:5000/api/admin/stats", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    setStats(res.data);
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -18,7 +39,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-4 gap-6">
         <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-lg rounded-xl p-6">
           <p className="text-sm">Tổng User</p>
-          <h3 className="text-3xl font-bold mt-2">150</h3>
+          <h3 className="text-3xl font-bold mt-2">{stats.totalUsers}</h3>
         </div>
 
         <div className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg rounded-xl p-6">
