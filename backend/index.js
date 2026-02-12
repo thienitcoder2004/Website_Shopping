@@ -9,8 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use("/api/auth", require("./src/routes/auth.routes"));
+
 app.get("/", (req, res) => {
-    res.send("Dental Clinic API is running");
+    res.send("Server đang khởi động...");
 });
 
 const PORT = process.env.PORT || 5000;
@@ -18,5 +20,5 @@ const PORT = process.env.PORT || 5000;
 connectDB();
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
 });
