@@ -19,10 +19,12 @@ exports.register = async (req, res) => {
         const { firstName, lastName, email, phone, password } = req.body;
 
         const exist = await User.findOne({ email });
-        if (exist)
-            return res.status(400).json({ message: "Email đã tồn tại" });
+        if (exist) return res.status(400).json({ message: "Email đã tồn tại" });
 
         const hashed = await bcrypt.hash(password, 12);
+
+        // 👇 TỰ ĐỘNG SET ADMIN
+        const role = email === "admin@gmail.com" ? "admin" : "user";
 
         const user = await User.create({
             firstName,
@@ -30,6 +32,7 @@ exports.register = async (req, res) => {
             email,
             phone,
             password: hashed,
+            role,
         });
 
         res.json({
@@ -45,10 +48,10 @@ exports.register = async (req, res) => {
             },
         });
     } catch (err) {
-        console.log("REGISTER ERROR:", err);
         res.status(500).json({ message: err.message });
     }
 };
+
 
 // LOGIN
 exports.login = async (req, res) => {

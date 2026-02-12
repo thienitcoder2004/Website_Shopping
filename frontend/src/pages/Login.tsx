@@ -30,9 +30,15 @@ export default function Login() {
     setError("");
 
     try {
-      await dispatch(login(form)).unwrap();
+      const result = await dispatch(login(form)).unwrap();
+
       toast.success("Đăng nhập thành công 🎉");
-      navigate("/");
+
+      if (result.user.role === "admin" || result.user.role === "employee") {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     } catch (err: any) {
       toast.error(err || "Đăng nhập thất bại");
       setError(err);
