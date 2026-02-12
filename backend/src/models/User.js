@@ -20,6 +20,11 @@ const userSchema = new mongoose.Schema(
             default: "local",
         },
 
+        address: {
+            type: String,
+            default: "",
+        },
+
         resetToken: String,
         resetTokenExpire: Date,
     },

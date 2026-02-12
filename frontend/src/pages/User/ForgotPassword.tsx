@@ -21,12 +21,12 @@ export default function ForgotPassword() {
 
   return (
     <section className="bg-gray-100 py-10">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="p-10">
-          <h2 className="text-lg font-semibold border-b-2 border-orange-600 pb-2 mb-8">
-            Quên Mật Khẩu
-          </h2>
+      <div className="max-w-4xl mx-auto px-4">
+        <h2 className="text-lg font-semibold border-b-2 border-orange-600 pb-2 mb-8">
+          Quên Mật Khẩu
+        </h2>
 
+        <div className="bg-white p-10 shadow-sm space-y-5">
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
               type="email"

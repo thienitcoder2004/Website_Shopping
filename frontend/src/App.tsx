@@ -11,6 +11,8 @@ import ContactPage from "./pages/User/ContactPage";
 import NewsPage from "./pages/User/NewsPage";
 import ForgotPassword from "./pages/User/ForgotPassword";
 import ResetPassword from "./pages/User/ResetPassword";
+import Account from "./pages/Account";
+import PrivateRoute from "./routes/PrivateRoute";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +42,14 @@ export default function App() {
             <Route path="/cart" element={<ShoppingCart />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route
+              path="/account"
+              element={
+                <PrivateRoute>
+                  <Account />
+                </PrivateRoute>
+              }
+            />
           </Routes>
         </Suspense>
       </MainLayout>
