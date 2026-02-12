@@ -6,5 +6,6 @@ router.post("/register", auth.register);
 router.post("/login", auth.login);
 router.post("/forgot-password", auth.forgotPassword);
 router.post("/reset-password/:token", auth.resetPassword);
+router.put("/update-profile", protect, auth.updateProfile);
 
 module.exports = router;

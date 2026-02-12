@@ -41,6 +41,7 @@ exports.register = async (req, res) => {
                 role: user.role,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                address: user.address,
             },
         });
     } catch (err) {
@@ -70,6 +71,7 @@ exports.login = async (req, res) => {
                 role: user.role,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                address: user.address,
             },
         });
     } catch (err) {
@@ -186,3 +188,27 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
+// UPDATE PROFILE
+exports.updateProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+
+        user.address = req.body.address || user.address;
+
+        await user.save();
+
+        res.json({
+            message: "Cập nhật thành công",
+            user: {
+                id: user._id,
+                email: user.email,
+                role: user.role,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                address: user.address,
+            },
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};

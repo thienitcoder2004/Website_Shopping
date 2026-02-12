@@ -1,23 +1,33 @@
 const jwt = require("jsonwebtoken");
 
 exports.protect = (req, res, next) => {
-    const token = req.headers.authorization?.split(" ")[1];
+    let token;
 
-    if (!token)
+    if (
+        req.headers.authorization &&
+        req.headers.authorization.startsWith("Bearer")
+    ) {
+        token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) {
         return res.status(401).json({ message: "Chưa đăng nhập" });
+    }
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
+
+        req.user = decoded; // { id, role }
         next();
-    } catch {
-        res.status(401).json({ message: "Token không hợp lệ" });
+    } catch (error) {
+        return res.status(401).json({ message: "Token không hợp lệ" });
     }
 };
 
 exports.adminOnly = (req, res, next) => {
-    if (req.user.role !== "admin")
-        return res.status(403).json({ message: "Không có quyền" });
+    if (!req.user || req.user.role !== "admin") {
+        return res.status(403).json({ message: "Không có quyền truy cập" });
+    }
 
     next();
 };

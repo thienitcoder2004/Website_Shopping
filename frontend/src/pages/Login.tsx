@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { Eye, EyeOff } from "lucide-react";
 import type { AppDispatch } from "../stores/store";
 import { login } from "../stores/authSlice";
 
@@ -14,6 +15,7 @@ export default function Login() {
     password: "",
   });
 
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -44,89 +46,54 @@ export default function Login() {
           ĐĂNG NHẬP TÀI KHOẢN
         </h2>
 
-        <div className="bg-white p-10 shadow-sm">
-          {error && (
-            <div className="bg-red-100 text-red-600 p-2 mb-4">{error}</div>
-          )}
-
-          {/* SOCIAL LOGIN */}
-          <div className="flex gap-4 mb-6">
-            <button
-              type="button"
-              onClick={() =>
-                (window.location.href = "http://localhost:5000/api/auth/google")
-              }
-              className="bg-red-600 text-white px-6 py-2 text-sm hover:bg-red-700"
-            >
-              Google
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                (window.location.href =
-                  "http://localhost:5000/api/auth/facebook")
-              }
-              className="bg-blue-600 text-white px-6 py-2 text-sm hover:bg-blue-700"
-            >
-              Facebook
-            </button>
-          </div>
+        <div className="bg-white p-10 shadow-sm space-y-5">
+          {error && <div className="bg-red-100 text-red-600 p-2">{error}</div>}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium mb-2">Email *</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                required
-                className="w-full border px-4 py-2 outline-none focus:border-orange-600"
-              />
-            </div>
+            <input
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={handleChange}
+              className="w-full border px-4 py-2"
+              required
+            />
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Mật khẩu *
-              </label>
+            <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 name="password"
+                placeholder="Mật khẩu"
                 value={form.password}
                 onChange={handleChange}
+                className="w-full border px-4 py-2 pr-10"
                 required
-                className="w-full border px-4 py-2 outline-none focus:border-orange-600"
               />
+              <div
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <button
-                type="submit"
-                className="bg-orange-600 text-white px-6 py-2 hover:bg-orange-700 transition"
-              >
-                Đăng nhập
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate("/forgot-password")}
-                className="text-sm text-gray-500 hover:text-orange-600"
-              >
-                Mất mật khẩu?
-              </button>
-            </div>
-
-            <div>
-              <button
-                type="button"
-                onClick={() => navigate("/register")}
-                className="text-sm text-gray-600 hover:text-orange-600"
-              >
-                Đăng ký
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="bg-orange-600 text-white px-6 py-2 w-full"
+            >
+              Đăng nhập
+            </button>
           </form>
+
+          <div className="text-sm text-center mt-4">
+            <button
+              onClick={() => navigate("/forgot-password")}
+              className="text-gray-500 hover:text-orange-600"
+            >
+              Mất mật khẩu?
+            </button>
+          </div>
         </div>
       </div>
     </section>
