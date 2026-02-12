@@ -17,6 +17,7 @@ import AdminRoute from "./routes/AdminRoute";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminLayout from "./layouts/AdminLayout";
 import UsersPage from "./pages/Admin/UsersPage";
+import CategoriesPage from "./pages/Admin/CategoriesPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +71,9 @@ export default function App() {
           </Route>
           <Route path="employees" element={<div>Quản lý nhân viên</div>} />
           <Route path="products" element={<div>Quản lý sản phẩm</div>} />
-          <Route path="categories" element={<div>Quản lý danh mục</div>} />
+          <Route path="categories" element={<CategoriesPage />}>
+            Quản lý danh mục
+          </Route>
           <Route path="orders" element={<div>Quản lý đơn hàng</div>} />
           <Route path="news" element={<div>Quản lý tin tức</div>} />
           <Route path="contacts" element={<div>Quản lý liên hệ</div>} />

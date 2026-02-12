@@ -12,7 +12,7 @@ app.use(express.json());
 
 app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/admin", require("./src/routes/admin.routes"));
-
+app.use("/api/categories", require("./src/routes/category.routes"));
 
 app.get("/", (req, res) => {
     res.send("Server đang khởi động...");
@@ -28,14 +28,14 @@ const createDefaultAdmin = async () => {
         const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
 
         if (!adminEmail || !adminPassword) {
-            console.log("⚠️ DEFAULT_ADMIN not set in .env");
+            console.log("DEFAULT_ADMIN not set in .env");
             return;
         }
 
         const existingAdmin = await User.findOne({ email: adminEmail });
 
         if (existingAdmin) {
-            console.log("ℹ️ Admin already exists");
+            console.log("Admin already exists");
             return;
         }
 
@@ -50,9 +50,9 @@ const createDefaultAdmin = async () => {
             provider: "local",
         });
 
-        console.log("🔥 Default Admin Created");
-        console.log("📧 Email:", adminEmail);
-        console.log("🔑 Password:", adminPassword);
+        console.log("Default Admin Created");
+        console.log("Email:", adminEmail);
+        console.log("Password:", adminPassword);
     } catch (error) {
         console.log("Create Admin Error:", error.message);
     }
