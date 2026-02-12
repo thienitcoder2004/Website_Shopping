@@ -11,13 +11,14 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/auth", require("./src/routes/auth.routes"));
+app.use("/api/admin", require("./src/routes/admin.routes"));
+
 
 app.get("/", (req, res) => {
     res.send("Server đang khởi động...");
 });
 
 const PORT = process.env.PORT || 5000;
-
 
 const User = require("./src/models/User");
 

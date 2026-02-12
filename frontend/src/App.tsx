@@ -16,6 +16,7 @@ import PrivateRoute from "./routes/PrivateRoute";
 import AdminRoute from "./routes/AdminRoute";
 import AdminDashboard from "./pages/Admin/AdminDashboard";
 import AdminLayout from "./layouts/AdminLayout";
+import UsersPage from "./pages/Admin/UsersPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +40,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/news" element={<NewsPage />} />
+          <Route path="/new" element={<NewsPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/cart" element={<ShoppingCart />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -64,11 +65,15 @@ export default function App() {
           }
         >
           <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<div>Quản lý người dùng</div>} />
+          <Route path="users" element={<UsersPage />}>
+            Quản lý người dùng
+          </Route>
           <Route path="employees" element={<div>Quản lý nhân viên</div>} />
           <Route path="products" element={<div>Quản lý sản phẩm</div>} />
           <Route path="categories" element={<div>Quản lý danh mục</div>} />
           <Route path="orders" element={<div>Quản lý đơn hàng</div>} />
+          <Route path="news" element={<div>Quản lý tin tức</div>} />
+          <Route path="contacts" element={<div>Quản lý liên hệ</div>} />
           <Route path="statistics" element={<div>Thống kê</div>} />
         </Route>
       </Routes>

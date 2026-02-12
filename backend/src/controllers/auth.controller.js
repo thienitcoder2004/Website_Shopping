@@ -66,6 +66,12 @@ exports.login = async (req, res) => {
         if (!match)
             return res.status(400).json({ message: "Sai mật khẩu" });
 
+        if (!user.isActive) {
+            return res.status(403).json({
+                message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.",
+            });
+        }
+
         res.json({
             token: generateToken(user),
             user: {
