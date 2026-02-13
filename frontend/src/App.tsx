@@ -23,6 +23,7 @@ import NewsPages from "./pages/Admin/NewsPages";
 import NewsForm from "./components/NewsForm";
 import NewsDetailPage from "./components/NewsDetailPage";
 import ContactsPage from "./pages/Admin/ContactsPage";
+import CouponsPage from "./pages/Admin/CouponsPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -81,6 +82,9 @@ export default function App() {
             Quản lý danh mục
           </Route>
           <Route path="orders" element={<div>Quản lý đơn hàng</div>} />
+          <Route path="coupon" element={<CouponsPage />}>
+            Quản lý giảm giá
+          </Route>
           <Route path="news" element={<NewsPages />}>
             Quản lý tin tức
           </Route>
