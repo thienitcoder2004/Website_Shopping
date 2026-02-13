@@ -17,6 +17,7 @@ app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/admin", require("./src/routes/admin.routes"));
 app.use("/api/categories", require("./src/routes/category.routes"));
 app.use("/api/news", require("./src/routes/news.routes"));
+app.use("/api/contacts", require("./src/routes/contact.routes"));
 
 app.get("/", (req, res) => {
     res.send("Server đang khởi động...");
