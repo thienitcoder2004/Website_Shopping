@@ -9,10 +9,14 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+app.use("/src/uploads", express.static("uploads"));
+app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/admin", require("./src/routes/admin.routes"));
 app.use("/api/categories", require("./src/routes/category.routes"));
+app.use("/api/news", require("./src/routes/news.routes"));
 
 app.get("/", (req, res) => {
     res.send("Server đang khởi động...");
