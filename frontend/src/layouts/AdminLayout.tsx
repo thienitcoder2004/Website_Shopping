@@ -10,6 +10,7 @@ import {
   LogOut,
   Newspaper,
   PhoneCall,
+  TicketPercent,
 } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { logout } from "../stores/authSlice";
@@ -38,6 +39,11 @@ export default function AdminLayout() {
       name: "Tin tức",
       icon: <Newspaper size={18} />,
       path: "/admin/news",
+    },
+    {
+      name: "Giảm giá",
+      icon: <TicketPercent size={18} />,
+      path: "/admin/coupon",
     },
     {
       name: "Liên hệ",
