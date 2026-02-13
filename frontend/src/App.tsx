@@ -22,6 +22,7 @@ import CategoriesPage from "./pages/Admin/CategoriesPage";
 import NewsPages from "./pages/Admin/NewsPages";
 import NewsForm from "./components/NewsForm";
 import NewsDetailPage from "./components/NewsDetailPage";
+import ContactsPage from "./pages/Admin/ContactsPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +86,9 @@ export default function App() {
           </Route>
           <Route path="/admin/news/create" element={<NewsForm />} />
           <Route path="/admin/news/edit/:id" element={<NewsForm />} />
-          <Route path="contacts" element={<div>Quản lý liên hệ</div>} />
+          <Route path="contacts" element={<ContactsPage />}>
+            Quản lý liên hệ
+          </Route>
           <Route path="statistics" element={<div>Thống kê</div>} />
         </Route>
       </Routes>
