@@ -31,7 +31,7 @@ export default function Login() {
 
     try {
       const result = await dispatch(login(form)).unwrap();
-
+      localStorage.setItem("accessToken", result.token);
       toast.success("Đăng nhập thành công 🎉");
 
       if (result.user.role === "admin" || result.user.role === "employee") {

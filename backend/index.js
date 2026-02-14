@@ -1,11 +1,14 @@
 require("dotenv").config();
-const bcrypt = require("bcryptjs");
 
 const express = require("express");
 const cors = require("cors");
-
+const bcrypt = require("bcryptjs");
 const connectDB = require("./src/config/database");
+const User = require("./src/models/User");
+
 const app = express();
+const PORT = process.env.PORT || 5000;
+
 
 app.use(cors());
 app.use(express.json());
@@ -19,14 +22,12 @@ app.use("/api/categories", require("./src/routes/category.routes"));
 app.use("/api/news", require("./src/routes/news.routes"));
 app.use("/api/contacts", require("./src/routes/contact.routes"));
 app.use("/api/coupons", require("./src/routes/coupon.routes"));
+app.use("/api/brands", require("./src/routes/brand.routes"));
 
 app.get("/", (req, res) => {
-    res.send("Server đang khởi động...");
+    res.send("Server is running ...");
 });
 
-const PORT = process.env.PORT || 5000;
-
-const User = require("./src/models/User");
 
 const createDefaultAdmin = async () => {
     try {
@@ -34,7 +35,7 @@ const createDefaultAdmin = async () => {
         const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
 
         if (!adminEmail || !adminPassword) {
-            console.log("DEFAULT_ADMIN not set in .env");
+            console.log("Default admin not set in .env");
             return;
         }
 
@@ -68,5 +69,5 @@ connectDB();
 createDefaultAdmin();
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+    console.log(`🚀 Server is running at http://localhost:${PORT}`);
 });
