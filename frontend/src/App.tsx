@@ -25,6 +25,11 @@ import NewsDetailPage from "./components/NewsDetailPage";
 import ContactsPage from "./pages/Admin/ContactsPage";
 import CouponsPage from "./pages/Admin/CouponsPage";
 import BrandsPage from "./pages/Admin/BrandsPage";
+import Inventory from "./pages/Admin/Inventory";
+import ProductList from "./pages/User/ProductList";
+import ProductDetail from "./pages/User/ProductDetail";
+import ProductListAdmin from "./pages/Admin/ProductList";
+import ProductForm from "./pages/Admin/ProductForm";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -50,6 +55,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/new" element={<NewsPage />} />
           <Route path="/new/:slug" element={<NewsDetailPage />} />
+          <Route path="/products" element={<ProductList />} />
+          <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/cart" element={<ShoppingCart />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -78,7 +85,9 @@ export default function App() {
             Quản lý người dùng
           </Route>
           <Route path="employees" element={<div>Quản lý nhân viên</div>} />
-          <Route path="products" element={<div>Quản lý sản phẩm</div>} />
+          <Route path="products" element={<ProductListAdmin />} />
+          <Route path="products/:id" element={<ProductForm />} />{" "}
+          <Route path="inventory" element={<Inventory />} />
           <Route path="categories" element={<CategoriesPage />}>
             Quản lý danh mục
           </Route>

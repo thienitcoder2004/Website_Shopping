@@ -16,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/src/uploads", express.static("uploads"));
 app.use("/uploads", express.static("uploads"));
+app.use("/api/upload", require("./src/routes/upload.routes"));
 app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/admin", require("./src/routes/admin.routes"));
 app.use("/api/categories", require("./src/routes/category.routes"));
@@ -23,6 +24,8 @@ app.use("/api/news", require("./src/routes/news.routes"));
 app.use("/api/contacts", require("./src/routes/contact.routes"));
 app.use("/api/coupons", require("./src/routes/coupon.routes"));
 app.use("/api/brands", require("./src/routes/brand.routes"));
+app.use("/api/products", require("./src/routes/product.routes"));
+app.use("/api/inventory", require("./src/routes/inventory.route"));
 
 app.get("/", (req, res) => {
     res.send("Server is running ...");
