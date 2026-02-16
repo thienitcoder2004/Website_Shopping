@@ -62,7 +62,7 @@ const BrandsPage = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
+    <div className="p-6 bg-gray-100">
       <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <h2 className="text-2xl font-bold mb-6 text-gray-700">
           Quản lý thương hiệu

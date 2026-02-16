@@ -7,19 +7,17 @@ const {
     updateUser,
     deleteUser,
     toggleUserStatus,
-    getDashboardStats
+    getDashboardStats,
 } = require("../controllers/admin.controller");
 
 const { protect, adminOnly } = require("../middlewares/auth.middleware");
 
-router.get("/stats", getDashboardStats);
+router.get("/stats", protect, adminOnly, getDashboardStats);
 
-router.use(protect, adminOnly);
-
-router.get("/users", getUsers);
-router.post("/users", createUser);
-router.put("/users/:id", updateUser);
-router.delete("/users/:id", deleteUser);
-router.patch("/users/:id/toggle", toggleUserStatus);
+router.get("/users", protect, adminOnly, getUsers);
+router.post("/users", protect, adminOnly, createUser);
+router.put("/users/:id", protect, adminOnly, updateUser);
+router.delete("/users/:id", protect, adminOnly, deleteUser);
+router.patch("/users/:id/toggle", protect, adminOnly, toggleUserStatus);
 
 module.exports = router;

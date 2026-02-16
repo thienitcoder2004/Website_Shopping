@@ -1,9 +1,10 @@
-module.exports = function slugify(text) {
-    return text
-        .toLowerCase()
+module.exports = function slugify(str = "") {
+    return str
+        .toString()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9 ]/g, "")
+        .toLowerCase()
         .trim()
-        .replace(/\s+/g, "-");
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "");
 };

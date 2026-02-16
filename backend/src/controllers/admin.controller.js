@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
+const Product = require("../models/Product");
 
 // GET ALL USERS
 exports.getUsers = async (req, res) => {
@@ -79,17 +80,21 @@ exports.toggleUserStatus = async (req, res) => {
 exports.getDashboardStats = async (req, res) => {
     try {
         const totalUsers = await User.countDocuments({
-            email: { $ne: "admin@gmail.com" }
+            email: { $ne: "admin@gmail.com" },
         });
 
         const totalActiveUsers = await User.countDocuments({
             isActive: true,
-            email: { $ne: "admin@gmail.com" }
+            email: { $ne: "admin@gmail.com" },
         });
 
+        const totalActiveProducts = await Product.countDocuments({ isActive: true }); // ✅ nếu cần
+        const totalProducts = await Product.countDocuments({});
         res.json({
             totalUsers,
-            totalActiveUsers
+            totalActiveUsers,
+            totalProducts,
+            totalActiveProducts,
         });
     } catch (error) {
         res.status(500).json({ message: error.message });

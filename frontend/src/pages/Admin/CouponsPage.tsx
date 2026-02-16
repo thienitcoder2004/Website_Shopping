@@ -8,8 +8,6 @@ import {
 import Pagination from "../../components/Pagination";
 
 export default function CouponsPage() {
-  /* ================= STATE ================= */
-
   const [coupons, setCoupons] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -26,8 +24,6 @@ export default function CouponsPage() {
     isActive: true,
   });
 
-  /* ================= FETCH DATA ================= */
-
   const fetchData = async () => {
     const res = await getCoupons();
     setCoupons(res.data.data);
@@ -37,13 +33,9 @@ export default function CouponsPage() {
     fetchData();
   }, []);
 
-  /* ================= RESET PAGE WHEN SEARCH ================= */
-
   useEffect(() => {
     setCurrentPage(1);
   }, [search]);
-
-  /* ================= FORM ================= */
 
   const resetForm = () => {
     setForm({
