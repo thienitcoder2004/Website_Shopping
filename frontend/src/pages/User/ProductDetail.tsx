@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
 import { productApi } from "../../api/product.api";
 import type { TProduct } from "../../types/product.type";
 import ProductZoomSimple from "../../components/ProductZoomSimple";
+
+import { useCart } from "../../context/cart.context"; // ✅ đúng path nếu b để context ở src/context
 
 type TabKey = "info" | "how" | "policy";
 
@@ -17,8 +21,9 @@ function sortSizes(arr: string[]) {
 }
 
 export default function ProductDetail() {
-  // ✅ type params để TS sạch
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { addItem } = useCart(); // ✅
 
   const [product, setProduct] = useState<TProduct | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,14 +68,26 @@ export default function ProductDetail() {
 
   const onAddToCart = () => {
     if (!product) return;
-    if (!canBuy) return alert("Sản phẩm hiện không mua được");
-    if (qty <= 0) return alert("Số lượng không hợp lệ");
 
-    alert(
-      `Đã thêm vào giỏ: ${product.name} - SL: ${qty}` +
-        (selectedColor ? ` - Màu: ${selectedColor}` : "") +
-        (selectedSize ? ` - Size: ${selectedSize}` : ""),
-    );
+    if (!canBuy) {
+      toast.error("Sản phẩm hiện không mua được");
+      return;
+    }
+
+    const n = Number(qty);
+    if (!Number.isFinite(n) || n <= 0) {
+      toast.error("Số lượng không hợp lệ");
+      return;
+    }
+
+    // ✅ add vào cart context (localStorage)
+    addItem(product, n, {
+      color: selectedColor || undefined,
+      size: selectedSize || undefined,
+    });
+
+    toast.success("Đã thêm vào giỏ hàng 🛒");
+    navigate("/cart"); // ✅ đúng route b nói
   };
 
   if (loading) return <div className="p-4">Đang tải...</div>;
@@ -295,7 +312,6 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* demo sử dụng biến displayPrice nếu cần */}
       <div className="hidden">{displayPrice}</div>
     </div>
   );

@@ -18,7 +18,6 @@ export default function AccessoriesSection() {
   return (
     <section className="bg-gray-100 py-12">
       <div className="max-w-7xl mx-auto px-4">
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-semibold border-l-4 border-orange-600 pl-3">
@@ -35,7 +34,6 @@ export default function AccessoriesSection() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* SALE BANNER */}
           <div className="relative overflow-hidden group">
             <img
               src={saleImg}

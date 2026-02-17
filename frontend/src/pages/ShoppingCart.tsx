@@ -1,62 +1,89 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import type { CartItem } from "../types/cart.type";
+import { useCart } from "../context/cart.context";
+import { apiFile } from "../utils/apiFile";
 
-type CartItem = {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
-};
+function formatPrice(v: number) {
+  return v.toLocaleString("vi-VN") + "₫";
+}
+
+function lineKey(it: CartItem) {
+  return `${it.id}-${it.variant?.color ?? ""}-${it.variant?.size ?? ""}`;
+}
 
 export default function ShoppingCart() {
-  const [cart, setCart] = useState<CartItem[]>([
-    {
-      id: 1,
-      name: "Bộ thể thao",
-      price: 180000,
-      quantity: 1,
-      image: "https://i.imgur.com/3aX9QKf.jpg",
-    },
-  ]);
+  const { items, increase, decrease, removeItem } = useCart();
 
-  const formatPrice = (price: number) => price.toLocaleString("vi-VN") + " đ";
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
 
-  const increase = (id: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item,
-      ),
-    );
+  useEffect(() => {
+    if (!items.length) {
+      setSelected({});
+      return;
+    }
+    setSelected((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const it of items) {
+        const k = lineKey(it);
+        next[k] = prev[k] ?? true;
+      }
+      return next;
+    });
+  }, [items]);
+
+  const allKeys = useMemo(() => items.map(lineKey), [items]);
+
+  const allChecked = useMemo(() => {
+    if (!allKeys.length) return false;
+    return allKeys.every((k) => selected[k]);
+  }, [allKeys, selected]);
+
+  const someChecked = useMemo(
+    () => allKeys.some((k) => selected[k]),
+    [allKeys, selected],
+  );
+
+  const toggleAll = (v: boolean) => {
+    const next: Record<string, boolean> = {};
+    for (const k of allKeys) next[k] = v;
+    setSelected(next);
   };
 
-  const decrease = (id: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id && item.quantity > 1
-          ? { ...item, quantity: item.quantity - 1 }
-          : item,
-      ),
-    );
+  const toggleOne = (k: string, v: boolean) => {
+    setSelected((prev) => ({ ...prev, [k]: v }));
   };
 
-  const removeItem = (id: number) => {
-    setCart((prev) => prev.filter((item) => item.id !== id));
-  };
+  const selectedItems = useMemo(
+    () => items.filter((it) => selected[lineKey(it)]),
+    [items, selected],
+  );
 
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const totalSelected = useMemo(
+    () => selectedItems.reduce((sum, it) => sum + it.price * it.quantity, 0),
+    [selectedItems],
+  );
+
+  const removeSelected = () => {
+    if (!someChecked) return;
+    if (!window.confirm("Xóa các sản phẩm đã chọn?")) return;
+    for (const it of selectedItems) removeItem(it.id, it.variant);
+  };
 
   return (
-    <section className="bg-gray-100 py-10">
+    <section className="bg-gray-100 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <div className="text-sm text-gray-600 mb-6">
-          Trang chủ / <span className="text-orange-600">Giỏ hàng</span>
+        <div className="text-sm text-gray-600 mb-5">
+          <Link to="/" className="hover:underline">
+            Trang chủ
+          </Link>{" "}
+          / <span className="text-orange-600">Giỏ hàng</span>
         </div>
 
-        <h2 className="text-2xl font-semibold mb-6">Giỏ hàng của bạn</h2>
+        <h2 className="text-2xl font-semibold mb-5">Giỏ hàng của bạn</h2>
 
-        {cart.length === 0 ? (
-          <div className="bg-white p-8 text-gray-600">
+        {items.length === 0 ? (
+          <div className="bg-white p-8 text-gray-600 rounded-lg">
             Không có sản phẩm nào.{" "}
             <Link to="/" className="text-orange-600 underline">
               Quay lại cửa hàng
@@ -64,147 +91,265 @@ export default function ShoppingCart() {
           </div>
         ) : (
           <>
-            {/* ================= DESKTOP TABLE ================= */}
-            <div className="hidden md:block bg-white shadow-sm overflow-x-auto">
-              <table className="w-full text-sm text-center">
-                <thead className="border-b">
-                  <tr>
-                    <th className="py-4">Ảnh</th>
-                    <th>Tên</th>
-                    <th>Đơn giá</th>
-                    <th>Số lượng</th>
-                    <th>Thành tiền</th>
-                    <th>Xóa</th>
-                  </tr>
-                </thead>
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="hidden md:grid grid-cols-[44px_1fr_140px_160px_140px_140px] items-center gap-3 px-4 py-4 text-sm text-gray-600 border-b">
+                <div className="flex items-center justify-center">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                </div>
+                <div className="font-medium text-gray-800">Sản Phẩm</div>
+                <div className="text-center">Đơn Giá</div>
+                <div className="text-center">Số Lượng</div>
+                <div className="text-center">Số Tiền</div>
+                <div className="text-center">Thao Tác</div>
+              </div>
 
-                <tbody>
-                  {cart.map((item) => (
-                    <tr key={item.id} className="border-b">
-                      <td className="py-6">
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-20 mx-auto"
-                        />
-                      </td>
+              <div className="divide-y">
+                {items.map((it) => {
+                  const k = lineKey(it);
+                  const img = it.image ? apiFile(it.image) : "";
+                  const amount = it.price * it.quantity;
 
-                      <td>{item.name}</td>
+                  const variantText = [
+                    it.variant?.color ? `Màu: ${it.variant.color}` : "",
+                    it.variant?.size ? `Size: ${it.variant.size}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" | ");
 
-                      <td className="text-orange-600 font-semibold">
-                        {formatPrice(item.price)}
-                      </td>
-
-                      <td>
-                        <div className="flex justify-center items-center border w-fit mx-auto">
-                          <button
-                            onClick={() => decrease(item.id)}
-                            className="px-3 py-1 border-r"
-                          >
-                            -
-                          </button>
-                          <span className="px-4">{item.quantity}</span>
-                          <button
-                            onClick={() => increase(item.id)}
-                            className="px-3 py-1 border-l"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </td>
-
-                      <td className="text-orange-600 font-semibold">
-                        {formatPrice(item.price * item.quantity)}
-                      </td>
-
-                      <td>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-gray-500 hover:text-red-500"
-                        >
-                          🗑
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="md:hidden space-y-4">
-              {cart.map((item) => (
-                <div key={item.id} className="bg-white p-4 shadow-sm">
-                  <div className="flex gap-4">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-24 h-24 object-cover"
-                    />
-
-                    <div className="flex-1">
-                      <h3 className="font-medium mb-2">{item.name}</h3>
-
-                      <p className="text-orange-600 font-semibold mb-2">
-                        {formatPrice(item.price)}
-                      </p>
-
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center border">
-                          <button
-                            onClick={() => decrease(item.id)}
-                            className="px-3 py-1 border-r"
-                          >
-                            -
-                          </button>
-                          <span className="px-4">{item.quantity}</span>
-                          <button
-                            onClick={() => increase(item.id)}
-                            className="px-3 py-1 border-l"
-                          >
-                            +
-                          </button>
+                  return (
+                    <div
+                      key={k}
+                      className="px-4 py-4 hover:bg-gray-50/70 transition"
+                    >
+                      {/* DESKTOP */}
+                      <div className="hidden md:grid grid-cols-[44px_1fr_140px_160px_140px_140px] items-center gap-3">
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="checkbox"
+                            checked={!!selected[k]}
+                            onChange={(e) => toggleOne(k, e.target.checked)}
+                            className="h-4 w-4"
+                          />
                         </div>
 
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          className="text-red-500 text-sm"
-                        >
-                          Xóa
-                        </button>
+                        <div className="flex gap-3">
+                          <div className="w-20 h-20 bg-gray-50 border rounded-md overflow-hidden flex items-center justify-center">
+                            {img ? (
+                              <img
+                                src={img}
+                                alt={it.name}
+                                className="w-full h-full object-cover"
+                                draggable={false}
+                              />
+                            ) : (
+                              <div className="text-xs text-gray-400">
+                                No image
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-900 line-clamp-2">
+                              {it.name}
+                            </div>
+                            {variantText && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Phân loại hàng:{" "}
+                                <span className="text-gray-700">
+                                  {variantText}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-center text-gray-800">
+                          {formatPrice(it.price)}
+                        </div>
+
+                        <div className="flex justify-center">
+                          <div className="inline-flex items-center border rounded-md overflow-hidden bg-white">
+                            <button
+                              type="button"
+                              onClick={() => decrease(it.id, it.variant)}
+                              className="px-3 py-2 hover:bg-gray-50 border-r"
+                            >
+                              -
+                            </button>
+                            <div className="w-10 text-center font-medium">
+                              {it.quantity}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => increase(it.id, it.variant)}
+                              className="px-3 py-2 hover:bg-gray-50 border-l"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="text-center font-semibold text-orange-600">
+                          {formatPrice(amount)}
+                        </div>
+
+                        <div className="text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(it.id, it.variant)}
+                            className="text-gray-700 hover:text-red-600 font-medium"
+                          >
+                            Xóa
+                          </button>
+                          <div className="mt-1 text-xs text-orange-600 cursor-pointer select-none">
+                            Tìm sản phẩm tương tự ▾
+                          </div>
+                        </div>
                       </div>
 
-                      <p className="mt-2 font-semibold">
-                        Thành tiền:{" "}
-                        <span className="text-orange-600">
-                          {formatPrice(item.price * item.quantity)}
-                        </span>
-                      </p>
+                      {/* MOBILE */}
+                      <div className="md:hidden">
+                        <div className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={!!selected[k]}
+                            onChange={(e) => toggleOne(k, e.target.checked)}
+                            className="h-4 w-4 mt-1"
+                          />
+
+                          <div className="w-20 h-20 bg-gray-50 border rounded-md overflow-hidden flex items-center justify-center">
+                            {img ? (
+                              <img
+                                src={img}
+                                alt={it.name}
+                                className="w-full h-full object-cover"
+                                draggable={false}
+                              />
+                            ) : (
+                              <div className="text-xs text-gray-400">
+                                No image
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 line-clamp-2">
+                              {it.name}
+                            </div>
+
+                            {variantText && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Phân loại:{" "}
+                                <span className="text-gray-700">
+                                  {variantText}
+                                </span>
+                              </div>
+                            )}
+
+                            <div className="mt-2 flex items-center justify-between">
+                              <div className="text-orange-600 font-semibold">
+                                {formatPrice(it.price)}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeItem(it.id, it.variant)}
+                                className="text-sm text-red-600"
+                              >
+                                Xóa
+                              </button>
+                            </div>
+
+                            <div className="mt-2 flex items-center justify-between">
+                              <div className="inline-flex items-center border rounded-md overflow-hidden bg-white">
+                                <button
+                                  type="button"
+                                  onClick={() => decrease(it.id, it.variant)}
+                                  className="px-3 py-2 hover:bg-gray-50 border-r"
+                                >
+                                  -
+                                </button>
+                                <div className="w-10 text-center font-medium">
+                                  {it.quantity}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => increase(it.id, it.variant)}
+                                  className="px-3 py-2 hover:bg-gray-50 border-l"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <div className="text-orange-600 font-semibold">
+                                {formatPrice(amount)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-2 text-xs text-orange-600 cursor-pointer select-none ml-7">
+                          Tìm sản phẩm tương tự ▾
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="mt-8 flex flex-col md:flex-row justify-between gap-6">
-              <Link
-                to="/"
-                className="bg-gray-200 px-6 py-3 w-fit self-start hover:bg-gray-300"
-              >
-                TIẾP TỤC MUA HÀNG
-              </Link>
+            <div className="mt-4 bg-white rounded-lg shadow-sm p-4 flex flex-col md:flex-row md:items-center gap-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm text-gray-700">
+                  Chọn tất cả ({items.length})
+                </span>
 
-              <div className="md:w-1/3 w-full">
-                <div className="flex justify-between border p-4 mb-4">
-                  <span>Tổng tiền</span>
-                  <span className="text-orange-600 font-semibold">
-                    {formatPrice(total)}
+                <button
+                  type="button"
+                  onClick={removeSelected}
+                  disabled={!someChecked}
+                  className="text-sm text-gray-700 hover:text-red-600 disabled:opacity-50 disabled:hover:text-gray-700"
+                >
+                  Xóa
+                </button>
+              </div>
+
+              <div className="md:ml-auto flex items-center justify-between md:justify-end gap-4">
+                <div className="text-sm text-gray-700">
+                  Tổng thanh toán ({selectedItems.length} sản phẩm):{" "}
+                  <span className="text-xl font-extrabold text-orange-600">
+                    {formatPrice(totalSelected)}
                   </span>
                 </div>
 
-                <button className="w-full bg-orange-600 text-white py-4 hover:bg-orange-700 transition">
-                  TIẾN HÀNH THANH TOÁN
+                <button
+                  type="button"
+                  disabled={!someChecked}
+                  onClick={() => alert("Bước tiếp theo: Checkout 😉")}
+                  className="px-6 py-3 rounded-md bg-orange-600 text-white font-bold hover:bg-orange-700 disabled:opacity-50 disabled:hover:bg-orange-600"
+                >
+                  Mua Hàng
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <Link
+                to="/"
+                className="inline-block bg-gray-200 px-6 py-3 hover:bg-gray-300 rounded-md"
+              >
+                TIẾP TỤC MUA HÀNG
+              </Link>
             </div>
           </>
         )}
