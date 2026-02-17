@@ -18,7 +18,6 @@ export function getFallbackImage() {
   return IMG_FALLBACK;
 }
 
-/** ghép url ảnh từ backend nếu DB lưu dạng "/uploads/..." */
 export function resolveImgUrl(url?: string) {
   if (!url) return "";
 

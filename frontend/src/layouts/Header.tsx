@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Menu, X, Search, ShoppingBag, Phone } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
@@ -7,12 +7,20 @@ import { logout } from "../stores/authSlice";
 import logo from "../assets/images/logo.png";
 import type { RootState } from "../stores/store";
 
+import { useCart } from "../context/cart.context";
+
 export default function Header() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
 
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
+
+  const { items } = useCart();
+
+  const cartCount = useMemo(() => {
+    return items.reduce((sum, it) => sum + (it.quantity ?? 0), 0);
+  }, [items]);
 
   const isActive = (path: string) =>
     location.pathname === path
@@ -46,6 +54,7 @@ export default function Header() {
                 <button
                   onClick={() => dispatch(logout())}
                   className="hover:underline"
+                  type="button"
                 >
                   Đăng xuất
                 </button>
@@ -68,7 +77,11 @@ export default function Header() {
       {/* ===== MAIN HEADER ===== */}
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 h-[80px] md:h-[110px] flex items-center justify-between">
-          <button className="lg:hidden" onClick={() => setOpen(!open)}>
+          <button
+            className="lg:hidden"
+            onClick={() => setOpen(!open)}
+            type="button"
+          >
             {open ? <X size={24} /> : <Menu size={24} />}
           </button>
 
@@ -103,11 +116,15 @@ export default function Header() {
               />
             </div>
 
+            {/* ✅ CART ICON + COUNT */}
             <Link to="/cart" className="relative">
               <ShoppingBag size={22} />
-              <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
-                0
-              </span>
+
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs min-w-5 h-5 px-1 flex items-center justify-center rounded-full">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
             </Link>
           </div>
         </div>

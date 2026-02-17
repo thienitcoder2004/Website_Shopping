@@ -62,7 +62,6 @@ export default function UsersPage() {
 
   useEffect(() => {
     void fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const deleteUser = async (id: string) => {
