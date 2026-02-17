@@ -15,7 +15,6 @@ export default function NewsForm() {
   const [images, setImages] = useState<FileList | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  // Load dữ liệu khi edit
   useEffect(() => {
     if (id) {
       getNewsById(id).then((res) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import Pagination from "../../components/Pagination";
@@ -13,23 +13,48 @@ interface News {
   content: string;
 }
 
+type NewsListResponse = {
+  data: News[];
+  totalPages: number;
+  page?: number;
+  total?: number;
+};
+
+const API_BASE = "http://localhost:5000";
+
+function stripHtml(html: string) {
+  return html.replace(/<[^>]+>/g, "");
+}
+
 export default function NewsPage() {
   const [newsData, setNewsData] = useState<News[]>([]);
-  const [latestNews, setLatestNews] = useState<News[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  const latestNews = useMemo(() => newsData.slice(0, 4), [newsData]);
 
   useEffect(() => {
-    fetchNews(currentPage);
+    const run = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.get<NewsListResponse>(`${API_BASE}/api/news`, {
+          params: { page: currentPage },
+        });
+
+        setNewsData(res.data.data ?? []);
+        setTotalPages(res.data.totalPages ?? 1);
+      } catch (err) {
+        console.error(err);
+        setNewsData([]);
+        setTotalPages(1);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void run();
   }, [currentPage]);
-
-  const fetchNews = async (page: number) => {
-    const res = await axios.get(`http://localhost:5000/api/news?page=${page}`);
-
-    setNewsData(res.data.data);
-    setLatestNews(res.data.data.slice(0, 4));
-    setTotalPages(res.data.totalPages);
-  };
 
   return (
     <section className="bg-white py-10 min-h-screen">
@@ -67,52 +92,70 @@ export default function NewsPage() {
               {latestNews.map((item) => (
                 <div key={item._id} className="flex gap-3 mb-4">
                   <img
-                    src={`http://localhost:5000${item.thumbnail}`}
-                    className="w-16 h-16 object-cover"
+                    src={`${API_BASE}${item.thumbnail}`}
+                    alt={item.title}
+                    className="w-16 h-16 object-cover rounded-md"
+                    loading="lazy"
                   />
                   <Link
                     to={`/news/${item.slug}`}
-                    className="text-xs hover:text-orange-600"
+                    className="text-xs hover:text-orange-600 line-clamp-3"
                   >
                     {item.title}
                   </Link>
                 </div>
               ))}
+
+              {!loading && latestNews.length === 0 && (
+                <div className="text-sm text-gray-500">Chưa có tin mới.</div>
+              )}
             </div>
           </aside>
 
           {/* MAIN CONTENT */}
           <div className="lg:col-span-3">
+            {loading && (
+              <div className="text-gray-500 mb-4">Đang tải tin tức...</div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              {newsData.map((item) => (
-                <div key={item._id}>
-                  <img
-                    src={`http://localhost:5000${item.thumbnail}`}
-                    className="w-full h-64 object-cover mb-4"
-                  />
+              {!loading &&
+                newsData.map((item) => (
+                  <div key={item._id}>
+                    <img
+                      src={`${API_BASE}${item.thumbnail}`}
+                      alt={item.title}
+                      className="w-full h-64 object-cover mb-4 rounded-lg"
+                      loading="lazy"
+                    />
 
-                  <h3 className="font-semibold text-lg mb-2 hover:text-orange-600">
-                    <Link to={`/news/${item.slug}`}>{item.title}</Link>
-                  </h3>
+                    <h3 className="font-semibold text-lg mb-2 hover:text-orange-600">
+                      <Link to={`/news/${item.slug}`}>{item.title}</Link>
+                    </h3>
 
-                  <p className="text-xs text-gray-500 mb-3">
-                    {new Date(item.createdAt).toLocaleDateString()} |{" "}
-                    {item.author}
-                  </p>
+                    <p className="text-xs text-gray-500 mb-3">
+                      {new Date(item.createdAt).toLocaleDateString("vi-VN")} |{" "}
+                      {item.author}
+                    </p>
 
-                  <p className="text-sm text-gray-600 mb-4 leading-6">
-                    {item.content.replace(/<[^>]+>/g, "").slice(0, 150)}...
-                  </p>
+                    <p className="text-sm text-gray-600 mb-4 leading-6">
+                      {stripHtml(item.content ?? "").slice(0, 150)}...
+                    </p>
 
-                  <Link
-                    to={`/new/${item.slug}`}
-                    className="border px-4 py-2 text-sm hover:bg-orange-600 hover:text-white transition"
-                  >
-                    XEM CHI TIẾT
-                  </Link>
-                </div>
-              ))}
+                    {/* ✅ sửa link /new -> /news */}
+                    <Link
+                      to={`/news/${item.slug}`}
+                      className="inline-flex items-center border px-4 py-2 text-sm hover:bg-orange-600 hover:text-white transition"
+                    >
+                      XEM CHI TIẾT
+                    </Link>
+                  </div>
+                ))}
             </div>
+
+            {!loading && newsData.length === 0 && (
+              <div className="text-gray-500 mt-4">Chưa có bài viết.</div>
+            )}
 
             <Pagination
               currentPage={currentPage}

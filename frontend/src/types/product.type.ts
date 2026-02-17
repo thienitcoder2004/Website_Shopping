@@ -1,3 +1,5 @@
+export type TObjectId = string;
+
 export type TProduct = {
   _id: string;
   name: string;
@@ -11,15 +13,18 @@ export type TProduct = {
 
   images: string[];
 
-  categoryId?: any;
-  brandId?: any;
-  warehouseStock?: number; 
+  categoryId?: TObjectId;   
+  brandId?: TObjectId;     
+
+  warehouseStock?: number;
   stock?: number;
+
   isActive: boolean;
 
   colors?: string[];
   sizes?: string[];
   primaryImage?: string;
+
   createdAt: string;
   updatedAt: string;
 };

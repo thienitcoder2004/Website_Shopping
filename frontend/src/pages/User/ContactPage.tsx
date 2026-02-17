@@ -2,36 +2,73 @@ import { MapPin, Phone, Mail } from "lucide-react";
 import { useState } from "react";
 import axios from "axios";
 
+type ContactForm = {
+  fullName: string;
+  email: string;
+  phone: string;
+  message: string;
+};
+
+type ContactErrors = Partial<Record<keyof ContactForm, string>>;
+
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 export default function ContactPage() {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<ContactForm>({
     fullName: "",
     email: "",
     phone: "",
     message: "",
   });
 
-  const [errors, setErrors] = useState<any>({});
+  const [errors, setErrors] = useState<ContactErrors>({});
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: any) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    // optional: xóa lỗi field ngay khi người dùng sửa
+    setErrors((prev) => ({
+      ...prev,
+      [name as keyof ContactForm]: undefined,
+    }));
   };
 
   const validate = () => {
-    const newErrors: any = {};
+    const newErrors: ContactErrors = {};
 
     if (!form.fullName.trim()) newErrors.fullName = "Vui lòng nhập họ tên";
-    if (!form.email.match(/^\S+@\S+\.\S+$/))
+
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim()))
       newErrors.email = "Email không hợp lệ";
-    if (form.phone.length < 9) newErrors.phone = "Số điện thoại không hợp lệ";
+
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (phoneDigits.length < 9) newErrors.phone = "Số điện thoại không hợp lệ";
+
     if (!form.message.trim()) newErrors.message = "Vui lòng nhập nội dung";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSuccess("");
 
@@ -50,8 +87,8 @@ export default function ContactPage() {
         message: "",
       });
       setErrors({});
-    } catch (error) {
-      alert("Có lỗi xảy ra");
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Có lỗi xảy ra"));
     } finally {
       setLoading(false);
     }
@@ -109,7 +146,7 @@ export default function ContactPage() {
               src="https://www.google.com/maps?q=266%20%C4%90%E1%BB%99i%20C%E1%BA%A5n%20H%C3%A0%20N%E1%BB%99i&output=embed"
               className="w-full h-full border-0"
               loading="lazy"
-            ></iframe>
+            />
           </div>
 
           {/* CONTACT FORM */}
@@ -175,7 +212,7 @@ export default function ContactPage() {
                   placeholder="Nội dung"
                   rows={5}
                   className="w-full border px-4 py-3 rounded-lg outline-none focus:border-orange-600"
-                ></textarea>
+                />
                 {errors.message && (
                   <p className="text-red-500 text-sm mt-1">{errors.message}</p>
                 )}

@@ -39,6 +39,12 @@ export default function Register() {
     });
   };
 
+  const toErrorMessage = (err: unknown) => {
+    if (typeof err === "string") return err;
+    if (err instanceof Error) return err.message;
+    return "Đăng ký thất bại";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -61,9 +67,10 @@ export default function Register() {
 
       toast.success("Đăng ký thành công 🎉");
       navigate("/");
-    } catch (err: any) {
-      toast.error(err || "Đăng ký thất bại");
-      setError(err);
+    } catch (err: unknown) {
+      const msg = toErrorMessage(err);
+      toast.error(msg);
+      setError(msg);
     }
   };
 

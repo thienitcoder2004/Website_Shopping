@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import { productApi } from "../../api/product.api";
 import { getCategories } from "../../api/category.api";
 import { getBrands } from "../../api/brand.api";
@@ -27,7 +28,30 @@ type FormState = {
   colorsText: string;
   sizesText: string;
 
-  // ảnh
+  primaryImage: string;
+  images: string[];
+};
+
+type IdLike = string | { _id: string };
+
+type ProductUpsertPayload = {
+  name: string;
+  slug?: string;
+  sku?: string;
+  description?: string;
+
+  price: number;
+  salePrice?: number;
+
+  categoryId: string;
+  brandId?: string;
+
+  isActive: boolean;
+  stock: number;
+
+  colors?: string[];
+  sizes?: string[];
+
   primaryImage: string;
   images: string[];
 };
@@ -60,8 +84,30 @@ function parseCSV(text: string) {
     .filter(Boolean);
 }
 
+function pickId(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object" && "_id" in v) {
+    const id = (v as { _id?: unknown })._id;
+    if (typeof id === "string") return id;
+  }
+  return "";
+}
+
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = (err.response?.data as { message?: unknown } | undefined)
+      ?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 export default function ProductForm() {
-  const { id } = useParams();
+  const params = useParams<{ id?: string }>();
+  const id = params.id;
   const isNew = !id || id === "new";
   const nav = useNavigate();
 
@@ -71,16 +117,23 @@ export default function ProductForm() {
   const [categories, setCategories] = useState<TCategory[]>([]);
   const [brands, setBrands] = useState<TBrand[]>([]);
 
-  const setField = (k: keyof FormState, v: any) =>
+  const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setState((s) => ({ ...s, [k]: v }));
+  };
 
   // load categories + brands
   useEffect(() => {
     const run = async () => {
       try {
         const [cRes, bRes] = await Promise.all([getCategories(), getBrands()]);
-        const cData = cRes.data?.data ?? cRes.data ?? [];
-        const bData = bRes.data?.data ?? bRes.data ?? [];
+
+        const cData: TCategory[] = (cRes.data?.data ??
+          cRes.data ??
+          []) as TCategory[];
+        const bData: TBrand[] = (bRes.data?.data ??
+          bRes.data ??
+          []) as TBrand[];
+
         setCategories(cData);
         setBrands(bData);
 
@@ -88,27 +141,28 @@ export default function ProductForm() {
           ...s,
           categoryId: s.categoryId || cData?.[0]?._id || "",
         }));
-      } catch (e) {
-        console.error(e);
-        alert("Không load được categories/brands");
+      } catch (err: unknown) {
+        console.error(err);
+        alert(getAxiosErrorMessage(err, "Không load được categories/brands"));
       }
     };
-    run();
+
+    void run();
   }, []);
 
   // load product for edit
   useEffect(() => {
     const run = async () => {
       if (isNew) return;
+      if (!id) return;
+
       setLoading(true);
       try {
-        const res = await productApi.getById(id!);
-        const p: any = res.data.data as TProduct;
+        const res = await productApi.getById(id);
+        const p = res.data.data as TProduct;
 
         const primary = p.primaryImage || p.images?.[0] || "";
-        const gallery = (p.images || []).filter(
-          (x: string) => x && x !== primary,
-        );
+        const gallery = (p.images || []).filter((x) => x && x !== primary);
 
         setState({
           name: p.name || "",
@@ -119,14 +173,10 @@ export default function ProductForm() {
           price: p.price || 0,
           salePrice: p.salePrice || 0,
 
-          categoryId:
-            typeof p.categoryId === "string"
-              ? p.categoryId
-              : p.categoryId?._id || "",
-          brandId:
-            typeof p.brandId === "string" ? p.brandId : p.brandId?._id || "",
+          categoryId: pickId(p.categoryId as unknown as IdLike),
+          brandId: pickId(p.brandId as unknown as IdLike),
 
-          isActive: !!p.isActive,
+          isActive: Boolean(p.isActive),
           stock: p.stock || 0,
 
           colorsText: (p.colors || []).join(", "),
@@ -139,7 +189,8 @@ export default function ProductForm() {
         setLoading(false);
       }
     };
-    run();
+
+    void run();
   }, [id, isNew]);
 
   const pricePreview = useMemo(() => {
@@ -169,7 +220,7 @@ export default function ProductForm() {
     setLoading(true);
     try {
       const res = await uploadFiles(arr);
-      const uploaded: string[] = res.data?.data?.files ?? [];
+      const uploaded: string[] = (res.data?.data?.files ?? []) as string[];
 
       setState((s) => {
         let primary = s.primaryImage;
@@ -185,8 +236,8 @@ export default function ProductForm() {
         );
         return { ...s, primaryImage: primary, images: dedup };
       });
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Upload lỗi");
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Upload lỗi"));
     } finally {
       setLoading(false);
       const el = document.getElementById(
@@ -201,14 +252,14 @@ export default function ProductForm() {
     if (!state.categoryId) return alert("Chọn danh mục");
     if (!state.primaryImage) return alert("Chọn ảnh chính (Primary)");
 
-    const payload: any = {
+    const payload: ProductUpsertPayload = {
       name: state.name.trim(),
-      slug: state.slug.trim(),
-      sku: state.sku.trim(),
+      slug: state.slug.trim() || undefined,
+      sku: state.sku.trim() || undefined,
       description: state.description,
 
       price: Number(state.price || 0),
-      salePrice: Number(state.salePrice || 0),
+      salePrice: Number(state.salePrice || 0) || undefined,
 
       categoryId: state.categoryId,
       brandId: state.brandId || undefined,
@@ -226,10 +277,11 @@ export default function ProductForm() {
     setLoading(true);
     try {
       if (isNew) await productApi.create(payload);
-      else await productApi.update(id!, payload);
+      else if (id) await productApi.update(id, payload);
+
       nav("/admin/products");
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Lỗi lưu sản phẩm");
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Lỗi lưu sản phẩm"));
     } finally {
       setLoading(false);
     }
@@ -461,7 +513,13 @@ export default function ProductForm() {
   );
 }
 
-function Field({ label, children }: { label: string; children: any }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label className="block text-sm font-semibold mb-1">{label}</label>

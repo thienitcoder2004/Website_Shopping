@@ -10,9 +10,9 @@ export default function ProductList() {
   useEffect(() => {
     const run = async () => {
       const res = await productApi.list({ page: 1, limit: 60, isActive: true });
-      setItems(res.data.data.items);
+      setItems(res.data.data.items ?? []);
     };
-    run();
+    void run();
   }, []);
 
   return (
@@ -20,8 +20,11 @@ export default function ProductList() {
       <h2 className="text-xl font-bold mb-4">Sản phẩm</h2>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {items.map((p: any) => {
+        {items.map((p) => {
           const thumb = p.primaryImage || p.images?.[0] || "";
+          const price = p.salePrice && p.salePrice > 0 ? p.salePrice : p.price;
+          const stock = p.stock ?? 0;
+
           return (
             <Link
               key={p._id}
@@ -34,6 +37,7 @@ export default function ProductList() {
                     src={apiFile(thumb)}
                     alt={p.name}
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -46,15 +50,13 @@ export default function ProductList() {
                 <div className="font-bold line-clamp-2 min-h-[44px]">
                   {p.name}
                 </div>
+
                 <div className="mt-2 font-extrabold">
-                  {(p.salePrice && p.salePrice > 0
-                    ? p.salePrice
-                    : p.price
-                  ).toLocaleString()}
-                  ₫
+                  {price.toLocaleString("vi-VN")}₫
                 </div>
+
                 <div className="mt-1 text-xs text-gray-600">
-                  {p.stock > 0 ? `Còn hàng: ${p.stock}` : "Hết hàng"}
+                  {stock > 0 ? `Còn hàng: ${stock}` : "Hết hàng"}
                 </div>
               </div>
             </Link>
