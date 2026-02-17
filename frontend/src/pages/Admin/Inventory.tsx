@@ -1,14 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { productApi } from "../../api/product.api";
 import { inventoryApi } from "../../api/inventory.api";
 import type { TProduct } from "../../types/product.type";
 import type { TInventoryLog } from "../../types/inventory.type";
 
-function formatType(t: "IN" | "OUT" | "ADJUST") {
+type InventoryType = "IN" | "OUT" | "ADJUST";
+
+function formatType(t: InventoryType) {
   if (t === "IN") return "Nhập kho";
   if (t === "OUT") return "Xuất ra web";
   return "Chỉnh kho";
+}
+
+function isInventoryType(v: string): v is InventoryType {
+  return v === "IN" || v === "OUT" || v === "ADJUST";
+}
+
+function getErrorMessage(err: unknown): string {
+  // Axios error
+  if (axios.isAxiosError(err)) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+    return "Lỗi gọi API";
+  }
+
+  // normal Error
+  if (err instanceof Error) return err.message;
+
+  return "Lỗi cập nhật kho";
 }
 
 export default function Inventory() {
@@ -18,7 +41,7 @@ export default function Inventory() {
   const [logs, setLogs] = useState<TInventoryLog[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [type, setType] = useState<"IN" | "OUT" | "ADJUST">("IN");
+  const [type, setType] = useState<InventoryType>("IN");
   const [qty, setQty] = useState<number>(1);
   const [note, setNote] = useState<string>("");
 
@@ -40,17 +63,18 @@ export default function Inventory() {
   };
 
   useEffect(() => {
-    loadProducts();
+    void loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (selected) loadLogs(selected);
+    if (selected) void loadLogs(selected);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
   const onAdjust = async () => {
     if (!selected) return alert("Chọn sản phẩm");
+
     const n = Number(qty);
     if (!Number.isFinite(n) || n <= 0) return alert("Số lượng phải > 0");
 
@@ -62,8 +86,8 @@ export default function Inventory() {
       setQty(1);
       setNote("");
       alert("Cập nhật kho thành công");
-    } catch (e: any) {
-      alert(e?.response?.data?.message || "Lỗi cập nhật kho");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -141,7 +165,10 @@ export default function Inventory() {
               <label className="block text-sm font-semibold mb-1">Loại</label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as any)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (isInventoryType(v)) setType(v);
+                }}
                 className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-orange-200"
               >
                 <option value="IN">Nhập kho (+ kho)</option>
@@ -220,7 +247,7 @@ export default function Inventory() {
 
                     <td className="p-3">
                       <span className="font-extrabold">
-                        {formatType(l.type)}
+                        {formatType(l.type as InventoryType)}
                       </span>
                       <div className="text-xs text-gray-500">{l.type}</div>
                     </td>

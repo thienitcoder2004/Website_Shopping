@@ -8,42 +8,90 @@ import AddUserModal from "../../components/AddUserModal";
 import EditUserModal from "../../components/EditUserModal";
 import UserSearchBar from "../../components/UserSearchBar";
 
+type UserRole = "admin" | "employee" | "user" | string;
+
+export type TUser = {
+  _id: string;
+  email: string;
+  role: UserRole;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+const API_BASE = "http://localhost:5000";
+
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 export default function UsersPage() {
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const [users, setUsers] = useState<any[]>([]);
-  const [editUser, setEditUser] = useState<any>(null);
+  const [users, setUsers] = useState<TUser[]>([]);
+  const [editUser, setEditUser] = useState<TUser | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [keyword, setKeyword] = useState("");
 
   const fetchUsers = async () => {
-    const res = await axios.get("http://localhost:5000/api/admin/users", {
-      params: { keyword },
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!token) return;
 
-    setUsers(res.data);
+    try {
+      const res = await axios.get<TUser[]>(`${API_BASE}/api/admin/users`, {
+        params: { keyword },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setUsers(res.data ?? []);
+    } catch (err: unknown) {
+      toast.error(getAxiosErrorMessage(err, "Không tải được danh sách users"));
+      setUsers([]);
+    }
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    void fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const deleteUser = async (id: string) => {
-    await axios.delete(`http://localhost:5000/api/admin/users/${id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    toast.success("Đã xóa");
-    fetchUsers();
+    if (!token) return;
+
+    try {
+      await axios.delete(`${API_BASE}/api/admin/users/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success("Đã xóa");
+      await fetchUsers();
+    } catch (err: unknown) {
+      toast.error(getAxiosErrorMessage(err, "Xóa thất bại"));
+    }
   };
 
   const toggleUser = async (id: string) => {
-    await axios.patch(
-      `http://localhost:5000/api/admin/users/${id}/toggle`,
-      {},
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
-    fetchUsers();
+    if (!token) return;
+
+    try {
+      await axios.patch(
+        `${API_BASE}/api/admin/users/${id}/toggle`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      await fetchUsers();
+    } catch (err: unknown) {
+      toast.error(getAxiosErrorMessage(err, "Cập nhật trạng thái thất bại"));
+    }
   };
 
   return (

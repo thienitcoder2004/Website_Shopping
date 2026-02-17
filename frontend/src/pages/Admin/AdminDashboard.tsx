@@ -1,34 +1,60 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import type { RootState } from "../../stores/store";
+
+type AdminStats = {
+  totalUsers: number;
+  totalActiveUsers: number;
+  totalProducts: number;
+};
+
+type ApiErrorBody = {
+  message?: string;
+  error?: string;
+};
+
+const EMPTY_STATS: AdminStats = {
+  totalUsers: 0,
+  totalActiveUsers: 0,
+  totalProducts: 0,
+};
 
 export default function AdminDashboard() {
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalActiveUsers: 0,
-    totalProducts: 0,
-  });
-
-  const fetchStats = async () => {
-    try {
-      const res = await axios.get("http://localhost:5000/api/admin/stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setStats(res.data);
-    } catch (err: any) {
-      console.log("STATS ERROR:", err?.response?.status, err?.response?.data);
-      // nếu 401/403 => token sai hoặc user không phải admin
-    }
-  };
+  const [stats, setStats] = useState<AdminStats>(EMPTY_STATS);
 
   useEffect(() => {
-    if (!token) return; // ✅ rất quan trọng
-    fetchStats();
-  }, [token]); // ✅ chờ token có rồi mới call
+    if (!token) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const res = await axios.get<AdminStats>(
+          "http://localhost:5000/api/admin/stats",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+
+        if (!cancelled) setStats(res.data);
+      } catch (e: unknown) {
+        const err = e as AxiosError<ApiErrorBody>;
+        console.log(
+          "STATS ERROR:",
+          err.response?.status,
+          err.response?.data?.message ?? err.message,
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   return (
     <div className="space-y-8">

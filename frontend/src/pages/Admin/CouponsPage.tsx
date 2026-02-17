@@ -6,16 +6,55 @@ import {
   deleteCoupon,
 } from "../../api/coupon.api";
 import Pagination from "../../components/Pagination";
+import axios from "axios";
+
+type CouponType = "percentage" | "fixed";
+
+type TCoupon = {
+  _id: string;
+  code: string;
+  type: CouponType;
+  value: number;
+  startDate: string; // ISO string
+  endDate: string; // ISO string
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type CouponForm = {
+  code: string;
+  type: CouponType;
+  value: number;
+  startDate: string; // yyyy-mm-dd
+  endDate: string; // yyyy-mm-dd
+  isActive: boolean;
+};
+
+const itemsPerPage = 5;
+
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = (err.response?.data as { message?: unknown } | undefined)
+      ?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
 
 export default function CouponsPage() {
-  const [coupons, setCoupons] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<TCoupon[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const itemsPerPage = 5;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<CouponForm>({
     code: "",
     type: "percentage",
     value: 0,
@@ -25,12 +64,21 @@ export default function CouponsPage() {
   });
 
   const fetchData = async () => {
-    const res = await getCoupons();
-    setCoupons(res.data.data);
+    setLoading(true);
+    setError("");
+    try {
+      const res = await getCoupons();
+      const items = (res.data?.data ?? []) as TCoupon[];
+      setCoupons(items);
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, "Không tải được mã giảm giá"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
   }, []);
 
   useEffect(() => {
@@ -50,7 +98,7 @@ export default function CouponsPage() {
   };
 
   const handleSubmit = async () => {
-    if (!form.code || !form.startDate || !form.endDate) {
+    if (!form.code.trim() || !form.startDate || !form.endDate) {
       alert("Vui lòng nhập đầy đủ thông tin");
       return;
     }
@@ -60,32 +108,55 @@ export default function CouponsPage() {
       return;
     }
 
-    if (editingId) {
-      await updateCoupon(editingId, form);
-    } else {
-      await createCoupon(form);
-    }
+    // payload gửi lên BE (giữ đúng kiểu)
+    const payload: CouponForm = {
+      ...form,
+      code: form.code.trim().toUpperCase(),
+      value: Number(form.value || 0),
+    };
 
-    resetForm();
-    fetchData();
+    setLoading(true);
+    setError("");
+    try {
+      if (editingId) {
+        await updateCoupon(editingId, payload);
+      } else {
+        await createCoupon(payload);
+      }
+
+      resetForm();
+      await fetchData();
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Lưu mã giảm giá thất bại"));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (coupon: any) => {
+  const handleEdit = (coupon: TCoupon) => {
     setEditingId(coupon._id);
     setForm({
-      code: coupon.code,
-      type: coupon.type,
-      value: coupon.value,
-      startDate: coupon.startDate?.substring(0, 10),
-      endDate: coupon.endDate?.substring(0, 10),
-      isActive: coupon.isActive,
+      code: coupon.code ?? "",
+      type: coupon.type ?? "percentage",
+      value: coupon.value ?? 0,
+      startDate: coupon.startDate?.slice(0, 10) ?? "",
+      endDate: coupon.endDate?.slice(0, 10) ?? "",
+      isActive: !!coupon.isActive,
     });
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Bạn có chắc muốn xóa mã này?")) {
+    if (!window.confirm("Bạn có chắc muốn xóa mã này?")) return;
+
+    setLoading(true);
+    setError("");
+    try {
       await deleteCoupon(id);
-      fetchData();
+      await fetchData();
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Xóa thất bại"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,19 +169,23 @@ export default function CouponsPage() {
   /* ================= SEARCH ================= */
 
   const filteredCoupons = useMemo(() => {
-    return coupons.filter((c) =>
-      c.code.toLowerCase().includes(search.toLowerCase()),
-    );
+    const key = search.trim().toLowerCase();
+    if (!key) return coupons;
+    return coupons.filter((c) => c.code.toLowerCase().includes(key));
   }, [search, coupons]);
 
   /* ================= PAGINATION ================= */
 
-  const totalPages = Math.ceil(filteredCoupons.length / itemsPerPage);
-
-  const currentData = filteredCoupons.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage,
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCoupons.length / itemsPerPage),
   );
+
+  const currentData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredCoupons.slice(start, end);
+  }, [filteredCoupons, currentPage]);
 
   /* ================= UI ================= */
 
@@ -121,6 +196,11 @@ export default function CouponsPage() {
         <div>
           <h1 className="text-4xl font-bold text-gray-800">Quản lý Giảm Giá</h1>
           <p className="text-gray-500 mt-2">Tổng số mã: {coupons.length}</p>
+          {error && (
+            <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+              {error}
+            </p>
+          )}
         </div>
 
         <div className="relative">
@@ -142,14 +222,16 @@ export default function CouponsPage() {
             placeholder="Mã giảm giá"
             value={form.code}
             onChange={(e) =>
-              setForm({ ...form, code: e.target.value.toUpperCase() })
+              setForm((s) => ({ ...s, code: e.target.value.toUpperCase() }))
             }
             className="input-style"
           />
 
           <select
             value={form.type}
-            onChange={(e) => setForm({ ...form, type: e.target.value })}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, type: e.target.value as CouponType }))
+            }
             className="input-style"
           >
             <option value="percentage">Phần trăm (%)</option>
@@ -161,7 +243,7 @@ export default function CouponsPage() {
             placeholder="Giá trị"
             value={form.value}
             onChange={(e) =>
-              setForm({ ...form, value: Number(e.target.value) })
+              setForm((s) => ({ ...s, value: Number(e.target.value) }))
             }
             className="input-style"
           />
@@ -169,24 +251,25 @@ export default function CouponsPage() {
           <input
             type="date"
             value={form.startDate}
-            onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, startDate: e.target.value }))
+            }
             className="input-style"
           />
 
           <input
             type="date"
             value={form.endDate}
-            onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, endDate: e.target.value }))
+            }
             className="input-style"
           />
 
           <select
             value={form.isActive ? "true" : "false"}
             onChange={(e) =>
-              setForm({
-                ...form,
-                isActive: e.target.value === "true",
-              })
+              setForm((s) => ({ ...s, isActive: e.target.value === "true" }))
             }
             className="input-style"
           >
@@ -198,14 +281,16 @@ export default function CouponsPage() {
         <div className="mt-8 flex gap-4">
           <button
             onClick={handleSubmit}
-            className="bg-blue-600 hover:bg-blue-700 transition text-white px-8 py-3 rounded-xl shadow-md"
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 transition text-white px-8 py-3 rounded-xl shadow-md disabled:opacity-60"
           >
             {editingId ? "Cập nhật" : "Thêm mới"}
           </button>
 
           <button
             onClick={resetForm}
-            className="bg-gray-200 hover:bg-gray-300 transition px-8 py-3 rounded-xl"
+            disabled={loading}
+            className="bg-gray-200 hover:bg-gray-300 transition px-8 py-3 rounded-xl disabled:opacity-60"
           >
             Làm mới
           </button>
@@ -214,7 +299,11 @@ export default function CouponsPage() {
 
       {/* TABLE CARD */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
-        {currentData.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-lg">
+            Đang tải...
+          </div>
+        ) : currentData.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-lg">
             Không có mã giảm giá nào
           </div>
@@ -247,7 +336,8 @@ export default function CouponsPage() {
                         {c.type === "percentage" ? "Phần trăm" : "Số tiền"}
                       </td>
                       <td className="font-medium">
-                        {c.value.toLocaleString()} VNĐ
+                        {c.value.toLocaleString("vi-VN")}{" "}
+                        {c.type === "percentage" ? "%" : "VNĐ"}
                       </td>
                       <td>
                         {new Date(c.startDate).toLocaleDateString("vi-VN")}

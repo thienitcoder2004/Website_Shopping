@@ -1,23 +1,65 @@
 import { useEffect, useState } from "react";
 import { getNews, deleteNews } from "../../api/news.api";
 import { Link } from "react-router-dom";
+import axios from "axios";
+
+type TNews = {
+  _id: string;
+  title: string;
+  slug?: string;
+  thumbnail?: string;
+  author?: string;
+  createdAt: string;
+  content: string;
+};
+
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>/g, "").trim();
+}
+
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = (err.response?.data as { message?: unknown } | undefined)
+      ?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
 
 export default function NewsPages() {
-  const [news, setNews] = useState<any[]>([]);
+  const [news, setNews] = useState<TNews[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
 
   const fetchNews = async () => {
-    const res = await getNews();
-    setNews(res.data.data);
+    setLoading(true);
+    setError("");
+    try {
+      const res = await getNews();
+      const items = (res.data?.data ?? []) as TNews[];
+      setNews(items);
+    } catch (err: unknown) {
+      setError(getAxiosErrorMessage(err, "Không tải được tin tức"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchNews();
+    void fetchNews();
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (window.confirm("Bạn có chắc muốn xóa tin này?")) {
+    if (!window.confirm("Bạn có chắc muốn xóa tin này?")) return;
+
+    try {
       await deleteNews(id);
-      fetchNews();
+      await fetchNews();
+    } catch (err: unknown) {
+      alert(getAxiosErrorMessage(err, "Xóa thất bại"));
     }
   };
 
@@ -40,6 +82,12 @@ export default function NewsPages() {
         </Link>
       </div>
 
+      {error && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* TABLE CARD */}
       <div className="bg-white rounded-xl shadow-md overflow-hidden">
         <div className="overflow-x-auto">
@@ -57,56 +105,95 @@ export default function NewsPages() {
 
             {/* BODY */}
             <tbody className="divide-y">
-              {news.map((item) => (
-                <tr key={item._id} className="hover:bg-gray-50 transition">
-                  {/* Thumbnail */}
-                  <td className="px-6 py-4">
-                    {item.thumbnail ? (
-                      <img
-                        src={`http://localhost:5000${item.thumbnail}`}
-                        alt="thumbnail"
-                        className="w-16 h-16 object-cover rounded-lg border"
-                      />
-                    ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">
-                        No Image
-                      </div>
-                    )}
-                  </td>
+              {loading &&
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4">
+                      <div className="w-16 h-16 bg-gray-100 rounded-lg" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-48 bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-[520px] bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-24 bg-gray-100 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="h-4 w-24 bg-gray-100 rounded mx-auto" />
+                    </td>
+                  </tr>
+                ))}
 
-                  {/* Title */}
-                  <td className="px-6 py-4 font-medium text-gray-800">
-                    {item.title}
-                  </td>
+              {!loading &&
+                news.map((item) => {
+                  const preview = stripHtml(item.content).slice(0, 100);
 
-                  {/* Des */}
-                  <td className="px-6 py-4 text-gray-500 text-xs">
-                    {item.content.slice(0, 100)}...
-                  </td>
+                  return (
+                    <tr key={item._id} className="hover:bg-gray-50 transition">
+                      {/* Thumbnail */}
+                      <td className="px-6 py-4">
+                        {item.thumbnail ? (
+                          <img
+                            src={`http://localhost:5000${item.thumbnail}`}
+                            alt={item.title}
+                            className="w-16 h-16 object-cover rounded-lg border"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+                            No Image
+                          </div>
+                        )}
+                      </td>
 
-                  {/* Date */}
-                  <td className="px-6 py-4 text-gray-500">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </td>
+                      {/* Title */}
+                      <td className="px-6 py-4 font-medium text-gray-800">
+                        {item.title}
+                      </td>
 
-                  {/* Actions */}
-                  <td className="px-6 py-4 text-center space-x-4">
-                    <Link
-                      to={`/admin/news/edit/${item._id}`}
-                      className="text-yellow-600 hover:text-yellow-700 font-medium"
-                    >
-                      Sửa
-                    </Link>
+                      {/* Des */}
+                      <td className="px-6 py-4 text-gray-500 text-xs">
+                        {preview}
+                        {preview.length >= 100 ? "..." : ""}
+                      </td>
 
-                    <button
-                      onClick={() => handleDelete(item._id)}
-                      className="text-red-600 hover:text-red-700 font-medium"
-                    >
-                      Xóa
-                    </button>
+                      {/* Date */}
+                      <td className="px-6 py-4 text-gray-500">
+                        {new Date(item.createdAt).toLocaleDateString("vi-VN")}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-6 py-4 text-center space-x-4">
+                        <Link
+                          to={`/admin/news/edit/${item._id}`}
+                          className="text-yellow-600 hover:text-yellow-700 font-medium"
+                        >
+                          Sửa
+                        </Link>
+
+                        <button
+                          onClick={() => handleDelete(item._id)}
+                          className="text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Xóa
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+              {!loading && !news.length && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-6 py-10 text-center text-gray-500"
+                  >
+                    Chưa có tin tức
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { productApi } from "../../api/product.api";
 import type { TProduct } from "../../types/product.type";
@@ -7,6 +8,7 @@ import ProductZoomSimple from "../../components/ProductZoomSimple";
 type TabKey = "info" | "how" | "policy";
 
 const SIZE_ORDER = ["XS", "S", "M", "L", "XL", "XXL"];
+
 function sortSizes(arr: string[]) {
   const map = new Map(SIZE_ORDER.map((s, i) => [s, i]));
   return [...arr].sort(
@@ -15,8 +17,8 @@ function sortSizes(arr: string[]) {
 }
 
 export default function ProductDetail() {
-  // ✅ đổi id -> slug
-  const { slug } = useParams();
+  // ✅ type params để TS sạch
+  const { slug } = useParams<{ slug: string }>();
 
   const [product, setProduct] = useState<TProduct | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,12 +26,12 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [tab, setTab] = useState<TabKey>("info");
 
-  // chọn màu/size ở cột phải
   const colors = useMemo(() => product?.colors ?? [], [product]);
   const sizes = useMemo(
     () => (product?.sizes?.length ? sortSizes(product.sizes) : []),
     [product],
   );
+
   const [selectedColor, setSelectedColor] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
 
@@ -38,27 +40,26 @@ export default function ProductDetail() {
       if (!slug) return;
       setLoading(true);
       try {
-        // ✅ gọi theo slug
         const res = await productApi.getBySlug(slug);
         setProduct(res.data.data);
       } finally {
         setLoading(false);
       }
     };
-    run();
+
+    void run();
   }, [slug]);
 
-  // set default lựa chọn khi load xong product
   useEffect(() => {
     if (!product) return;
-    setSelectedColor((product.colors && product.colors[0]) || "");
-    setSelectedSize((product.sizes && sortSizes(product.sizes)[0]) || "");
+    setSelectedColor(product.colors?.[0] ?? "");
+    setSelectedSize(product.sizes?.length ? sortSizes(product.sizes)[0] : "");
   }, [product]);
 
-  const canBuy = useMemo(
-    () => !!product && product.stock > 0 && product.isActive,
-    [product],
-  );
+  const canBuy = useMemo(() => {
+    if (!product) return false;
+    return (product.stock ?? 0) > 0 && product.isActive;
+  }, [product]);
 
   const onAddToCart = () => {
     if (!product) return;
@@ -74,6 +75,11 @@ export default function ProductDetail() {
 
   if (loading) return <div className="p-4">Đang tải...</div>;
   if (!product) return <div className="p-4">Không tìm thấy sản phẩm</div>;
+
+  const displayPrice =
+    product.salePrice && product.salePrice > 0
+      ? product.salePrice
+      : product.price;
 
   return (
     <div className="max-w-6xl mx-auto p-4 pb-10">
@@ -114,7 +120,9 @@ export default function ProductDetail() {
             )}
 
             <div className="mt-2 text-sm text-gray-600">
-              {product.stock > 0 ? `Còn hàng: ${product.stock}` : "Hết hàng"}
+              {(product.stock ?? 0) > 0
+                ? `Còn hàng: ${product.stock}`
+                : "Hết hàng"}
             </div>
           </div>
 
@@ -189,19 +197,24 @@ export default function ProductDetail() {
             <div className="font-bold">Số lượng</div>
             <div className="flex items-center border rounded-lg overflow-hidden">
               <button
+                type="button"
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
                 className="px-3 py-2 hover:bg-gray-50"
               >
                 -
               </button>
+
               <input
                 value={qty}
                 onChange={(e) =>
                   setQty(Math.max(1, Number(e.target.value) || 1))
                 }
                 className="w-14 text-center outline-none"
+                inputMode="numeric"
               />
+
               <button
+                type="button"
                 onClick={() => setQty((q) => q + 1)}
                 className="px-3 py-2 hover:bg-gray-50"
               >
@@ -211,6 +224,7 @@ export default function ProductDetail() {
           </div>
 
           <button
+            type="button"
             onClick={onAddToCart}
             disabled={!canBuy}
             className="mt-4 w-full py-3 rounded-xl font-extrabold text-white bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -280,6 +294,9 @@ export default function ProductDetail() {
           )}
         </div>
       </div>
+
+      {/* demo sử dụng biến displayPrice nếu cần */}
+      <div className="hidden">{displayPrice}</div>
     </div>
   );
 }
@@ -291,10 +308,11 @@ function TabButton({
 }: {
   active: boolean;
   onClick: () => void;
-  children: any;
+  children: ReactNode;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`px-4 py-3 border font-extrabold ${
         active ? "bg-white border-b-white" : "bg-gray-50 hover:bg-gray-100"

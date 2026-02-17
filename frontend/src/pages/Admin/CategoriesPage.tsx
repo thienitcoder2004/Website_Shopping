@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getCategories,
   deleteCategory,
@@ -7,76 +7,162 @@ import {
 } from "../../api/category.api";
 import Pagination from "../../components/Pagination";
 
+type Category = {
+  _id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type CategoryPayload = {
+  name: string;
+  slug: string;
+  description?: string;
+};
+
+type ApiResponse<T> = {
+  data?: T;
+  total?: number;
+  totalPages?: number;
+  page?: number;
+  limit?: number;
+};
+
+type HttpResponse<T> = {
+  data: T;
+};
+
+function slugify(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-  });
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+  }>({ name: "", description: "" });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
   const fetchData = async () => {
-    const res = await getCategories();
-    setCategories(res.data);
+    const res = (await getCategories()) as unknown as HttpResponse<
+      Category[] | ApiResponse<Category[]>
+    >;
+
+    const data = res.data;
+
+    const list: Category[] = Array.isArray(data)
+      ? data
+      : Array.isArray(data.data)
+        ? data.data
+        : [];
+
+    setCategories(list);
   };
 
   useEffect(() => {
-    fetchData();
+    void (async () => {
+      await fetchData();
+    })();
   }, []);
+
+  const totalPages = useMemo(() => {
+    const n = Math.ceil(categories.length / itemsPerPage);
+    return Math.max(1, n);
+  }, [categories.length]);
+
+  // ✅ Không setState trong effect nữa, clamp ngay đây:
+  const safePage = useMemo(
+    () => clamp(currentPage, 1, totalPages),
+    [currentPage, totalPages],
+  );
+
+  const currentItems = useMemo(() => {
+    const start = (safePage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return categories.slice(start, end);
+  }, [categories, safePage]);
 
   const resetForm = () => {
     setFormData({ name: "", description: "" });
     setEditingId(null);
   };
 
-  const handleSubmit = async () => {
-    const slug = formData.name.toLowerCase().replace(/\s+/g, "-");
-
-    if (editingId) {
-      await updateCategory(editingId, { ...formData, slug });
-    } else {
-      await createCategory({ ...formData, slug });
-    }
-
+  const openCreate = () => {
     resetForm();
-    setShowModal(false);
-    fetchData();
+    setShowModal(true);
   };
 
-  const handleEdit = (cat: any) => {
+  const handleEdit = (cat: Category) => {
     setEditingId(cat._id);
     setFormData({
-      name: cat.name,
-      description: cat.description || "",
+      name: cat.name ?? "",
+      description: cat.description ?? "",
     });
     setShowModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Bạn có chắc muốn xóa?")) {
-      await deleteCategory(id);
-      fetchData();
+  const handleSubmit = async () => {
+    const name = formData.name.trim();
+    const description = formData.description.trim();
+
+    if (!name) {
+      alert("Vui lòng nhập tên danh mục");
+      return;
     }
+
+    const payload: CategoryPayload = {
+      name,
+      slug: slugify(name),
+      description: description || undefined,
+    };
+
+    if (editingId) {
+      await updateCategory(editingId, payload);
+    } else {
+      await createCategory(payload);
+    }
+
+    setShowModal(false);
+    resetForm();
+    await fetchData();
   };
 
-  // PAGINATION LOGIC
-  const indexOfLast = currentPage * itemsPerPage;
-  const indexOfFirst = indexOfLast - itemsPerPage;
-  const currentItems = categories.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(categories.length / itemsPerPage);
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Bạn có chắc muốn xóa?")) return;
+    await deleteCategory(id);
+    await fetchData();
+  };
 
   return (
     <div className="p-8 bg-gray-50">
       {/* HEADER */}
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Quản lý Danh Mục</h2>
+        <h2 className="text-2xl font-semibold text-slate-800">
+          Quản lý Danh Mục
+        </h2>
+
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreate}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition"
         >
           + Thêm Danh Mục
@@ -94,6 +180,7 @@ export default function CategoriesPage() {
               <th className="px-6 py-4 text-center">Hành động</th>
             </tr>
           </thead>
+
           <tbody>
             {currentItems.map((cat) => (
               <tr
@@ -103,43 +190,59 @@ export default function CategoriesPage() {
                 <td className="px-6 py-4 font-medium text-gray-800">
                   {cat.name}
                 </td>
-                <td className="px-6 py-4 text-gray-500">{cat.description}</td>
+                <td className="px-6 py-4 text-gray-500">
+                  {cat.description || "-"}
+                </td>
                 <td className="px-6 py-4">
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      cat.isActive
+                      cat.isActive !== false
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-600"
                     }`}
                   >
-                    {cat.isActive ? "Hiển thị" : "Ẩn"}
+                    {cat.isActive !== false ? "Hiển thị" : "Ẩn"}
                   </span>
                 </td>
-                <td className="px-6 py-4 flex justify-center gap-3">
-                  <button
-                    onClick={() => handleEdit(cat)}
-                    className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded-md text-sm"
-                  >
-                    Sửa
-                  </button>
-                  <button
-                    onClick={() => handleDelete(cat._id)}
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm"
-                  >
-                    Xóa
-                  </button>
+
+                <td className="px-6 py-4">
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={() => handleEdit(cat)}
+                      className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded-md text-sm"
+                    >
+                      Sửa
+                    </button>
+                    <button
+                      onClick={() => handleDelete(cat._id)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm"
+                    >
+                      Xóa
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+
+            {!currentItems.length && (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="px-6 py-10 text-center text-gray-500"
+                >
+                  Chưa có danh mục
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
       {/* PAGINATION */}
       <Pagination
-        currentPage={currentPage}
+        currentPage={safePage}
         totalPages={totalPages}
-        onPageChange={setCurrentPage}
+        onPageChange={(p) => setCurrentPage(clamp(p, 1, totalPages))}
       />
 
       {/* MODAL */}
@@ -155,7 +258,7 @@ export default function CategoriesPage() {
               placeholder="Tên danh mục"
               value={formData.name}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
+                setFormData((s) => ({ ...s, name: e.target.value }))
               }
               className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -164,7 +267,7 @@ export default function CategoriesPage() {
               placeholder="Mô tả"
               value={formData.description}
               onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
+                setFormData((s) => ({ ...s, description: e.target.value }))
               }
               className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />

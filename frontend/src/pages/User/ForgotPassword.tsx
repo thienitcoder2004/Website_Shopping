@@ -2,6 +2,17 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 import axios from "axios";
 
+function getAxiosErrorMessage(err: unknown, fallback: string) {
+  if (axios.isAxiosError(err)) {
+    const msg = err.response?.data?.message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    if (typeof err.message === "string" && err.message.trim())
+      return err.message;
+  }
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
 
@@ -14,8 +25,8 @@ export default function ForgotPassword() {
       });
 
       toast.success("Đã gửi email reset mật khẩu 📩");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message);
+    } catch (err: unknown) {
+      toast.error(getAxiosErrorMessage(err, "Gửi email thất bại"));
     }
   };
 

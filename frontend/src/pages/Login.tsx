@@ -6,11 +6,22 @@ import { Eye, EyeOff } from "lucide-react";
 import type { AppDispatch } from "../stores/store";
 import { login } from "../stores/authSlice";
 
+type LoginForm = {
+  email: string;
+  password: string;
+};
+
+const toErrorMessage = (err: unknown) => {
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  return "Đăng nhập thất bại";
+};
+
 export default function Login() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<LoginForm>({
     email: "",
     password: "",
   });
@@ -19,10 +30,11 @@ export default function Login() {
   const [error, setError] = useState("");
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,17 +43,23 @@ export default function Login() {
 
     try {
       const result = await dispatch(login(form)).unwrap();
+
+      // NOTE: authSlice của bạn cũng đã lưu token vào localStorage (key "token").
+      // Nếu muốn chỉ 1 nơi, bạn có thể bỏ dòng dưới hoặc đổi cho đồng bộ.
       localStorage.setItem("accessToken", result.token);
+
       toast.success("Đăng nhập thành công 🎉");
 
-      if (result.user.role === "admin" || result.user.role === "employee") {
+      const role = result.user.role;
+      if (role === "admin" || role === "employee") {
         navigate("/admin");
       } else {
         navigate("/");
       }
-    } catch (err: any) {
-      toast.error(err || "Đăng nhập thất bại");
-      setError(err);
+    } catch (err: unknown) {
+      const msg = toErrorMessage(err);
+      toast.error(msg);
+      setError(msg);
     }
   };
 
@@ -76,12 +94,14 @@ export default function Login() {
                 className="w-full border px-4 py-2 pr-10"
                 required
               />
-              <div
-                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-                onClick={() => setShowPassword(!showPassword)}
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-              </div>
+              </button>
             </div>
 
             <button
@@ -94,6 +114,7 @@ export default function Login() {
 
           <div className="text-sm text-center mt-4">
             <button
+              type="button"
               onClick={() => navigate("/forgot-password")}
               className="text-gray-500 hover:text-orange-600"
             >
