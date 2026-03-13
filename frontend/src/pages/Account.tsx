@@ -364,6 +364,7 @@ export default function Account() {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem("checkout_items");
     dispatch(logout());
     toast.success("Đăng xuất thành công");
     navigate("/");

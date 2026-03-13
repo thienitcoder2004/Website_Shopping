@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
+import { useSelector } from "react-redux";
+import type { RootState } from "../stores/store";
 import type { TProduct } from "../types/product.type";
 import type { CartItem, CartVariant } from "../types/cart.type";
 
@@ -12,12 +14,14 @@ type CartContextValue = {
   total: number;
 };
 
-const CART_KEY = "cart";
+function getCartKey(userId?: string) {
+  return userId ? `cart_user_${userId}` : "cart_guest";
+}
 
-/** ✅ Lưu theo 1 chuẩn duy nhất: { items: CartItem[] } */
-function readCart(): { items: CartItem[] } {
+/** đọc cart theo user */
+function readCartByKey(key: string): { items: CartItem[] } {
   try {
-    const raw = localStorage.getItem(CART_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return { items: [] };
 
     const parsed = JSON.parse(raw) as unknown;
@@ -36,13 +40,14 @@ function readCart(): { items: CartItem[] } {
   }
 }
 
-function writeCart(items: CartItem[]) {
-  localStorage.setItem(CART_KEY, JSON.stringify({ items }));
+function writeCartByKey(key: string, items: CartItem[]) {
+  localStorage.setItem(key, JSON.stringify({ items }));
 }
 
 function sameVariant(a?: CartVariant, b?: CartVariant) {
   return (
-    (a?.color ?? "") === (b?.color ?? "") && (a?.size ?? "") === (b?.size ?? "")
+    (a?.color ?? "") === (b?.color ?? "") &&
+    (a?.size ?? "") === (b?.size ?? "")
   );
 }
 
@@ -72,11 +77,19 @@ function toCartItem(
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => readCart().items);
+  const user = useSelector((state: RootState) => state.auth.user);
+  const cartKey = getCartKey(user?.id);
+
+  const [items, setItems] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    const cart = readCartByKey(cartKey);
+    setItems(cart.items);
+  }, [cartKey]);
 
   const sync = (next: CartItem[]) => {
     setItems(next);
-    writeCart(next);
+    writeCartByKey(cartKey, next);
   };
 
   const addItem: CartContextValue["addItem"] = (product, qty, variant) => {

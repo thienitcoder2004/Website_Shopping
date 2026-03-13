@@ -175,6 +175,12 @@ export default function ProductDetail() {
   const onAddToCart = () => {
     if (!product) return;
 
+    if (!token) {
+      toast.error("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng");
+      navigate("/login");
+      return;
+    }
+
     if (!canBuy) {
       toast.error("Sản phẩm hiện không mua được");
       return;
@@ -516,11 +522,19 @@ export default function ProductDetail() {
           <button
             type="button"
             onClick={onAddToCart}
-            disabled={!canBuy}
+            disabled={!canBuy || !token}
             className="mt-4 w-full py-3 rounded-xl font-extrabold text-white bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            THÊM VÀO GIỎ
+            {!token
+              ? "ĐĂNG NHẬP ĐỂ THÊM GIỎ HÀNG"
+              : "THÊM VÀO GIỎ"}
           </button>
+
+          {!token && (
+            <div className="mt-2 text-sm text-red-500">
+              Bạn cần đăng nhập mới có thể thêm sản phẩm vào giỏ hàng.
+            </div>
+          )}
 
           <div className="mt-4 text-sm text-gray-700">
             📞 Tư vấn miễn phí: <span className="font-bold">1900 6750</span>

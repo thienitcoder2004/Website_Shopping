@@ -34,6 +34,8 @@ app.get("/", (req, res) => {
     res.send("Server is running ...");
 });
 
+console.log(process.env.MONGO_URI);
+
 // ===== Create default admin =====
 const createDefaultAdmin = async () => {
     try {
