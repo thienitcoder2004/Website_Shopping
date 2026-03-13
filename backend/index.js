@@ -9,13 +9,15 @@ const User = require("./src/models/User");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-
+// ===== Middlewares =====
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/src/uploads", express.static("uploads"));
+// Static uploads
 app.use("/uploads", express.static("uploads"));
+
+// ===== Routes =====
 app.use("/api/upload", require("./src/routes/upload.routes"));
 app.use("/api/auth", require("./src/routes/auth.routes"));
 app.use("/api/admin", require("./src/routes/admin.routes"));
@@ -26,12 +28,13 @@ app.use("/api/coupons", require("./src/routes/coupon.routes"));
 app.use("/api/brands", require("./src/routes/brand.routes"));
 app.use("/api/products", require("./src/routes/product.routes"));
 app.use("/api/inventory", require("./src/routes/inventory.route"));
+app.use("/api/orders", require("./src/routes/order.routes"));
 
 app.get("/", (req, res) => {
     res.send("Server is running ...");
 });
 
-
+// ===== Create default admin =====
 const createDefaultAdmin = async () => {
     try {
         const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
@@ -68,9 +71,19 @@ const createDefaultAdmin = async () => {
     }
 };
 
-connectDB();
-createDefaultAdmin();
+// ===== Start app =====
+const startServer = async () => {
+    try {
+        await connectDB();
+        await createDefaultAdmin();
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running at http://localhost:${PORT}`);
-});
+        app.listen(PORT, () => {
+            console.log(`🚀 Server is running at http://localhost:${PORT}`);
+        });
+    } catch (error) {
+        console.error("Server startup error:", error.message);
+        process.exit(1);
+    }
+};
+
+startServer();

@@ -13,17 +13,18 @@ const generateToken = (user) => {
     );
 };
 
-// REGISTER 
+// REGISTER
 exports.register = async (req, res) => {
     try {
         const { firstName, lastName, email, phone, password } = req.body;
 
         const exist = await User.findOne({ email });
-        if (exist) return res.status(400).json({ message: "Email đã tồn tại" });
+        if (exist) {
+            return res.status(400).json({ message: "Email đã tồn tại" });
+        }
 
         const hashed = await bcrypt.hash(password, 12);
 
-        // 👇 TỰ ĐỘNG SET ADMIN
         const role = email === "admin@gmail.com" ? "admin" : "user";
 
         const user = await User.create({
@@ -33,6 +34,7 @@ exports.register = async (req, res) => {
             phone,
             password: hashed,
             role,
+            avatar: "",
         });
 
         res.json({
@@ -44,7 +46,9 @@ exports.register = async (req, res) => {
                 role: user.role,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                phone: user.phone,
                 address: user.address,
+                avatar: user.avatar,
             },
         });
     } catch (err) {
@@ -52,19 +56,20 @@ exports.register = async (req, res) => {
     }
 };
 
-
 // LOGIN
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
         const user = await User.findOne({ email });
-        if (!user)
+        if (!user) {
             return res.status(400).json({ message: "Sai email" });
+        }
 
         const match = await bcrypt.compare(password, user.password);
-        if (!match)
+        if (!match) {
             return res.status(400).json({ message: "Sai mật khẩu" });
+        }
 
         if (!user.isActive) {
             return res.status(403).json({
@@ -80,7 +85,9 @@ exports.login = async (req, res) => {
                 role: user.role,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                phone: user.phone,
                 address: user.address,
+                avatar: user.avatar,
             },
         });
     } catch (err) {
@@ -95,9 +102,14 @@ exports.changePassword = async (req, res) => {
         const user = await User.findById(req.user.id);
         const { oldPassword, newPassword } = req.body;
 
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng" });
+        }
+
         const match = await bcrypt.compare(oldPassword, user.password);
-        if (!match)
+        if (!match) {
             return res.status(400).json({ message: "Sai mật khẩu cũ" });
+        }
 
         user.password = await bcrypt.hash(newPassword, 12);
         await user.save();
@@ -131,27 +143,28 @@ const sendResetEmail = async (email, token) => {
         to: email,
         subject: "Reset mật khẩu",
         html: `
-      <h3>Reset mật khẩu</h3>
-      <p>Click link bên dưới để đổi mật khẩu:</p>
-      <a href="${resetLink}">${resetLink}</a>
-      <p>Link hết hạn sau 10 phút</p>
-    `,
+            <h3>Reset mật khẩu</h3>
+            <p>Click link bên dưới để đổi mật khẩu:</p>
+            <a href="${resetLink}">${resetLink}</a>
+            <p>Link hết hạn sau 10 phút</p>
+        `,
     });
 };
 
-// FORGOT PASSWORD 
+// FORGOT PASSWORD
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
 
         const user = await User.findOne({ email });
-        if (!user)
+        if (!user) {
             return res.status(400).json({ message: "Email không tồn tại" });
+        }
 
         const resetToken = crypto.randomBytes(32).toString("hex");
 
         user.resetToken = resetToken;
-        user.resetExpire = Date.now() + 10 * 60 * 1000; // 10 phút
+        user.resetTokenExpire = Date.now() + 10 * 60 * 1000;
 
         await user.save();
 
@@ -170,8 +183,6 @@ exports.resetPassword = async (req, res) => {
         const { token } = req.params;
         const { password } = req.body;
 
-        console.log("TOKEN:", token);
-
         const user = await User.findOne({
             resetToken: token,
         });
@@ -180,13 +191,13 @@ exports.resetPassword = async (req, res) => {
             return res.status(400).json({ message: "Token không hợp lệ" });
         }
 
-        if (user.resetExpire < Date.now()) {
+        if (!user.resetTokenExpire || user.resetTokenExpire < Date.now()) {
             return res.status(400).json({ message: "Token đã hết hạn" });
         }
 
         user.password = await bcrypt.hash(password, 12);
-        user.resetToken = undefined;
-        user.resetExpire = undefined;
+        user.resetToken = "";
+        user.resetTokenExpire = null;
 
         await user.save();
 
@@ -197,12 +208,37 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
+// GET PROFILE
+exports.getProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("-password");
+
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng" });
+        }
+
+        res.json({ user });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
 // UPDATE PROFILE
 exports.updateProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
 
-        user.address = req.body.address || user.address;
+        if (!user) {
+            return res.status(404).json({ message: "Không tìm thấy người dùng" });
+        }
+
+        const { firstName, lastName, phone, address, avatar } = req.body;
+
+        if (firstName !== undefined) user.firstName = firstName;
+        if (lastName !== undefined) user.lastName = lastName;
+        if (phone !== undefined) user.phone = phone;
+        if (address !== undefined) user.address = address;
+        if (avatar !== undefined) user.avatar = avatar;
 
         await user.save();
 
@@ -214,7 +250,9 @@ exports.updateProfile = async (req, res) => {
                 role: user.role,
                 firstName: user.firstName,
                 lastName: user.lastName,
+                phone: user.phone,
                 address: user.address,
+                avatar: user.avatar,
             },
         });
     } catch (err) {

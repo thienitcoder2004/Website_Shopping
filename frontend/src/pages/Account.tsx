@@ -1,10 +1,10 @@
 import { useSelector, useDispatch } from "react-redux";
 import { Navigate, useNavigate } from "react-router-dom";
-import { logout } from "../stores/authSlice";
+import { logout, updateProfile } from "../stores/authSlice";
 import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Camera, SquarePen, Check, X } from "lucide-react";
 import type { RootState, AppDispatch } from "../stores/store";
 
 /** Types for provinces.open-api.vn */
@@ -12,23 +12,20 @@ type VNProvince = { code: number; name: string };
 type VNDistrict = { code: number; name: string };
 type VNWard = { code: number; name: string };
 
-/** Re-use Auth user type from Redux */
-type AuthUser = NonNullable<RootState["auth"]["user"]>;
-
-/** API responses */
-type UpdateProfileResponse = {
-  user: AuthUser;
-};
-
 function getAxiosErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const msg = err.response?.data?.message;
     if (typeof msg === "string" && msg.trim()) return msg;
-    if (typeof err.message === "string" && err.message.trim())
+    if (typeof err.message === "string" && err.message.trim()) {
       return err.message;
+    }
   }
   if (err instanceof Error && err.message.trim()) return err.message;
   return fallback;
+}
+
+function normalizePhone(value: string) {
+  return value.replace(/\D/g, "").trim();
 }
 
 export default function Account() {
@@ -37,6 +34,8 @@ export default function Account() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
+  const defaultAvatar = "http://localhost:5000/uploads/default-avatar.png";
+
   // password
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -44,6 +43,21 @@ export default function Account() {
   const [showOld, setShowOld] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // profile
+  const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+
+  // inline edit
+  const [editingName, setEditingName] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [savingInline, setSavingInline] = useState(false);
+
+  // avatar
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState(defaultAvatar);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   // address data
   const [provinces, setProvinces] = useState<VNProvince[]>([]);
@@ -55,7 +69,28 @@ export default function Account() {
   const [wardCode, setWardCode] = useState<string>("");
   const [detailAddress, setDetailAddress] = useState<string>("");
 
-  // load provinces
+  useEffect(() => {
+    const currentAvatar =
+      user?.avatar && user.avatar.trim()
+        ? user.avatar.startsWith("http")
+          ? user.avatar
+          : `http://localhost:5000${user.avatar}`
+        : defaultAvatar;
+
+    setAvatarPreview(currentAvatar);
+    setPhone(user?.phone ?? "");
+    setFirstName(user?.firstName ?? "");
+    setLastName(user?.lastName ?? "");
+  }, [user]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
   useEffect(() => {
     const run = async () => {
       try {
@@ -70,7 +105,6 @@ export default function Account() {
     void run();
   }, []);
 
-  // load districts by province
   useEffect(() => {
     if (!provinceCode) return;
 
@@ -93,7 +127,6 @@ export default function Account() {
     void run();
   }, [provinceCode]);
 
-  // load wards by district
   useEffect(() => {
     if (!districtCode) return;
 
@@ -115,12 +148,8 @@ export default function Account() {
   }, [districtCode]);
 
   const fullAddress = useMemo(() => {
-    const province = provinces.find(
-      (p) => String(p.code) === provinceCode,
-    )?.name;
-    const district = districts.find(
-      (d) => String(d.code) === districtCode,
-    )?.name;
+    const province = provinces.find((p) => String(p.code) === provinceCode)?.name;
+    const district = districts.find((d) => String(d.code) === districtCode)?.name;
     const ward = wards.find((w) => String(w.code) === wardCode)?.name;
 
     const parts = [detailAddress, ward, district, province].filter(
@@ -138,7 +167,126 @@ export default function Account() {
     wards,
   ]);
 
-  const handleSaveAddress = async (e: React.FormEvent) => {
+  const handleChooseAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn file hình ảnh");
+      return;
+    }
+
+    if (avatarPreview.startsWith("blob:")) {
+      URL.revokeObjectURL(avatarPreview);
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const uploadAvatar = async () => {
+    if (!avatarFile || !token) return null;
+
+    const formData = new FormData();
+    formData.append("avatar", avatarFile);
+
+    setUploadingAvatar(true);
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/upload", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return res.data?.url || null;
+    } catch (err: unknown) {
+      toast.error(getAxiosErrorMessage(err, "Upload ảnh thất bại"));
+      return null;
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setFirstName(user?.firstName ?? "");
+    setLastName(user?.lastName ?? "");
+    setEditingName(false);
+  };
+
+  const handleCancelEditPhone = () => {
+    setPhone(user?.phone ?? "");
+    setEditingPhone(false);
+  };
+
+  const handleQuickSave = async (type: "name" | "phone") => {
+    if (!token) {
+      toast.error("Bạn chưa đăng nhập");
+      return;
+    }
+
+    try {
+      const payload: {
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+      } = {};
+
+      if (type === "name") {
+        const trimmedFirstName = firstName.trim();
+        const trimmedLastName = lastName.trim();
+
+        if (!trimmedFirstName || !trimmedLastName) {
+          toast.error("Vui lòng nhập đầy đủ họ và tên");
+          return;
+        }
+
+        if (trimmedFirstName !== (user?.firstName ?? "")) {
+          payload.firstName = trimmedFirstName;
+        }
+
+        if (trimmedLastName !== (user?.lastName ?? "")) {
+          payload.lastName = trimmedLastName;
+        }
+
+        if (!payload.firstName && !payload.lastName) {
+          setEditingName(false);
+          return;
+        }
+      }
+
+      if (type === "phone") {
+        const normalized = normalizePhone(phone);
+
+        if (phone.trim() && normalized.length < 9) {
+          toast.error("Số điện thoại không hợp lệ");
+          return;
+        }
+
+        if (normalized !== normalizePhone(user?.phone ?? "")) {
+          payload.phone = normalized;
+        }
+
+        if (!payload.phone) {
+          setEditingPhone(false);
+          return;
+        }
+      }
+
+      setSavingInline(true);
+      await dispatch(updateProfile(payload)).unwrap();
+      toast.success("Đã lưu thành công 🎉");
+
+      if (type === "name") setEditingName(false);
+      if (type === "phone") setEditingPhone(false);
+    } catch (err: unknown) {
+      toast.error(typeof err === "string" ? err : "Lưu thất bại");
+    } finally {
+      setSavingInline(false);
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!token) {
@@ -147,18 +295,32 @@ export default function Account() {
     }
 
     try {
-      const res = await axios.put<UpdateProfileResponse>(
-        "http://localhost:5000/api/auth/update-profile",
-        { address: fullAddress },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const payload: {
+        address?: string;
+        avatar?: string;
+      } = {};
 
-      toast.success("Cập nhật địa chỉ thành công 🎉");
+      if (fullAddress.trim() && fullAddress !== (user?.address ?? "")) {
+        payload.address = fullAddress;
+      }
 
-      localStorage.setItem("user", JSON.stringify(res.data.user));
-      window.location.reload();
+      if (avatarFile) {
+        const uploadedAvatar = await uploadAvatar();
+        if (!uploadedAvatar) return;
+        payload.avatar = uploadedAvatar;
+      }
+
+      if (!payload.address && !payload.avatar) {
+        toast.info("Bạn chưa thay đổi thông tin nào");
+        return;
+      }
+
+      await dispatch(updateProfile(payload)).unwrap();
+
+      toast.success("Cập nhật thông tin thành công 🎉");
+      setAvatarFile(null);
     } catch (err: unknown) {
-      toast.error(getAxiosErrorMessage(err, "Lỗi cập nhật địa chỉ"));
+      toast.error(typeof err === "string" ? err : "Lỗi cập nhật thông tin");
     }
   };
 
@@ -167,6 +329,11 @@ export default function Account() {
 
     if (!token) {
       toast.error("Bạn chưa đăng nhập");
+      return;
+    }
+
+    if (!oldPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      toast.error("Vui lòng nhập đầy đủ thông tin mật khẩu");
       return;
     }
 
@@ -202,172 +369,344 @@ export default function Account() {
     navigate("/");
   };
 
-  // ✅ không navigate trong render
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <section className="bg-gray-100 py-10 min-h-screen">
-      <div className="max-w-4xl mx-auto bg-white p-10 shadow-sm space-y-8">
-        <h2 className="text-xl font-semibold border-b pb-3">
-          Tài khoản của bạn
-        </h2>
+    <section className="min-h-screen bg-slate-100 py-10">
+      <div className="mx-auto max-w-5xl px-4">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-lg">
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 px-8 py-6 text-white">
+            <h2 className="text-2xl font-bold">Tài khoản của bạn</h2>
+            <p className="mt-1 text-sm text-orange-100">
+              Quản lý thông tin cá nhân, ảnh đại diện và mật khẩu
+            </p>
+          </div>
 
-        <div className="space-y-2">
-          <p>
-            <strong>Họ tên:</strong> {user.firstName} {user.lastName}
-          </p>
-          <p>
-            <strong>Email:</strong> {user.email}
-          </p>
-          <p>
-            <strong>Địa chỉ hiện tại:</strong> {user.address || "Chưa cập nhật"}
-          </p>
-        </div>
+          <div className="grid gap-8 p-8 lg:grid-cols-[320px_1fr]">
+            <div className="space-y-6">
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <div className="flex flex-col items-center text-center">
+                  <label className="group relative cursor-pointer">
+                    <img
+                      src={avatarPreview}
+                      alt="Avatar"
+                      className="h-44 w-44 rounded-full border-4 border-orange-100 object-cover shadow-md transition duration-200 group-hover:opacity-85"
+                      onError={(e) => {
+                        e.currentTarget.src = defaultAvatar;
+                      }}
+                    />
 
-        <div className="border-t pt-6">
-          <h3 className="font-semibold mb-4">Cập nhật địa chỉ</h3>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/35 opacity-0 transition duration-200 group-hover:opacity-100">
+                      <div className="flex flex-col items-center gap-1 text-white">
+                        <Camera size={20} />
+                        <span className="text-sm font-medium">Đổi ảnh</span>
+                      </div>
+                    </div>
 
-          <form onSubmit={handleSaveAddress} className="space-y-4">
-            <select
-              value={provinceCode}
-              onChange={(e) => setProvinceCode(e.target.value)}
-              className="w-full border px-4 py-2"
-              required
-            >
-              <option value="">Chọn Tỉnh / Thành phố</option>
-              {provinces.map((p) => (
-                <option key={p.code} value={String(p.code)}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleChooseAvatar}
+                      className="hidden"
+                    />
+                  </label>
 
-            <select
-              value={districtCode}
-              onChange={(e) => setDistrictCode(e.target.value)}
-              className="w-full border px-4 py-2"
-              required
-              disabled={!provinceCode}
-            >
-              <option value="">Chọn Quận / Huyện</option>
-              {districts.map((d) => (
-                <option key={d.code} value={String(d.code)}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+                  <h3 className="mt-4 text-xl font-semibold text-slate-800">
+                    {user.firstName} {user.lastName}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">{user.email}</p>
 
-            <select
-              value={wardCode}
-              onChange={(e) => setWardCode(e.target.value)}
-              className="w-full border px-4 py-2"
-              required
-              disabled={!districtCode}
-            >
-              <option value="">Chọn Phường / Xã</option>
-              {wards.map((w) => (
-                <option key={w.code} value={String(w.code)}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+                  <div className="mt-4 w-full rounded-xl bg-slate-50 p-4 text-left">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                        <span className="shrink-0 font-semibold text-slate-700">
+                          Họ tên:
+                        </span>
 
-            <input
-              type="text"
-              placeholder="Số nhà, tên đường..."
-              value={detailAddress}
-              onChange={(e) => setDetailAddress(e.target.value)}
-              className="w-full border px-4 py-2"
-              required
-            />
+                        {editingName ? (
+                          <div className="flex flex-1 gap-2">
+                            <input
+                              type="text"
+                              value={firstName}
+                              onChange={(e) => setFirstName(e.target.value)}
+                              placeholder="Họ"
+                              className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-orange-500"
+                              disabled={savingInline}
+                            />
+                            <input
+                              type="text"
+                              value={lastName}
+                              onChange={(e) => setLastName(e.target.value)}
+                              placeholder="Tên"
+                              className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-orange-500"
+                              disabled={savingInline}
+                            />
+                          </div>
+                        ) : (
+                          <span className="truncate text-slate-900">
+                            {user.firstName} {user.lastName}
+                          </span>
+                        )}
+                      </div>
 
-            <button className="bg-orange-600 text-white px-6 py-2">
-              Lưu địa chỉ
-            </button>
-          </form>
-        </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {editingName ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void handleQuickSave("name")}
+                              disabled={savingInline}
+                              className="rounded-full p-1.5 text-green-600 transition hover:bg-green-50 disabled:opacity-50"
+                              title="Lưu"
+                            >
+                              <Check size={18} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditName}
+                              disabled={savingInline}
+                              className="rounded-full p-1.5 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                              title="Huỷ"
+                            >
+                              <X size={18} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditingName(true)}
+                            className="rounded-full p-1.5 text-orange-500 transition hover:bg-orange-50 hover:text-orange-600"
+                            title="Sửa họ tên"
+                          >
+                            <SquarePen size={18} strokeWidth={2.4} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-        <div className="border-t pt-6">
-          <h3 className="font-semibold mb-4">Đổi mật khẩu</h3>
+                    <p className="mt-3 text-sm">
+                      <span className="font-semibold text-slate-700">Email:</span>{" "}
+                      {user.email}
+                    </p>
 
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            {/* MẬT KHẨU CŨ */}
-            <div className="relative">
-              <input
-                type={showOld ? "text" : "password"}
-                placeholder="Mật khẩu cũ"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                className="w-full border px-4 py-2 pr-10"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowOld((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label={showOld ? "Hide old password" : "Show old password"}
-              >
-                {showOld ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+                        <span className="shrink-0 font-semibold text-slate-700">
+                          Số điện thoại:
+                        </span>
+
+                        {editingPhone ? (
+                          <input
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            placeholder="Nhập số điện thoại"
+                            className="min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition focus:border-orange-500"
+                            disabled={savingInline}
+                          />
+                        ) : (
+                          <span className="truncate text-slate-900">
+                            {user.phone || "Chưa cập nhật"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        {editingPhone ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => void handleQuickSave("phone")}
+                              disabled={savingInline}
+                              className="rounded-full p-1.5 text-green-600 transition hover:bg-green-50 disabled:opacity-50"
+                              title="Lưu"
+                            >
+                              <Check size={18} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEditPhone}
+                              disabled={savingInline}
+                              className="rounded-full p-1.5 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
+                              title="Huỷ"
+                            >
+                              <X size={18} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEditingPhone(true)}
+                            className="rounded-full p-1.5 text-orange-500 transition hover:bg-orange-50 hover:text-orange-600"
+                            title="Sửa số điện thoại"
+                          >
+                            <SquarePen size={18} strokeWidth={2.4} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="mt-3 text-sm">
+                      <span className="font-semibold text-slate-700">
+                        Địa chỉ hiện tại:
+                      </span>{" "}
+                      {user.address || "Chưa cập nhật"}
+                    </p>
+                  </div>
+
+                  <p className="mt-4 text-sm text-slate-500">
+                    Nhấn vào ảnh để chọn avatar mới
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <button
+                  onClick={handleLogout}
+                  className="w-full rounded-xl bg-red-600 px-6 py-3 font-medium text-white transition hover:bg-red-700"
+                >
+                  Đăng xuất
+                </button>
+              </div>
             </div>
 
-            {/* MẬT KHẨU MỚI */}
-            <div className="relative">
-              <input
-                type={showNew ? "text" : "password"}
-                placeholder="Mật khẩu mới"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full border px-4 py-2 pr-10"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowNew((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label={showNew ? "Hide new password" : "Show new password"}
-              >
-                {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
+            <div className="space-y-8">
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="mb-5 text-lg font-semibold text-slate-800">
+                  Cập nhật thông tin khác
+                </h3>
+
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <select
+                      value={provinceCode}
+                      onChange={(e) => setProvinceCode(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 outline-none transition focus:border-orange-500"
+                    >
+                      <option value="">Chọn Tỉnh / Thành phố</option>
+                      {provinces.map((p) => (
+                        <option key={p.code} value={String(p.code)}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={districtCode}
+                      onChange={(e) => setDistrictCode(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 outline-none transition focus:border-orange-500 disabled:bg-slate-100"
+                      disabled={!provinceCode}
+                    >
+                      <option value="">Chọn Quận / Huyện</option>
+                      {districts.map((d) => (
+                        <option key={d.code} value={String(d.code)}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
+                    <select
+                      value={wardCode}
+                      onChange={(e) => setWardCode(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 outline-none transition focus:border-orange-500 disabled:bg-slate-100"
+                      disabled={!districtCode}
+                    >
+                      <option value="">Chọn Phường / Xã</option>
+                      {wards.map((w) => (
+                        <option key={w.code} value={String(w.code)}>
+                          {w.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    <input
+                      type="text"
+                      placeholder="Số nhà, tên đường..."
+                      value={detailAddress}
+                      onChange={(e) => setDetailAddress(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 outline-none transition focus:border-orange-500"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={uploadingAvatar}
+                    className="rounded-xl bg-orange-600 px-6 py-3 font-medium text-white transition hover:bg-orange-700 disabled:opacity-60"
+                  >
+                    {uploadingAvatar ? "Đang tải ảnh..." : "Lưu thông tin"}
+                  </button>
+                </form>
+              </div>
+
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="mb-5 text-lg font-semibold text-slate-800">
+                  Đổi mật khẩu
+                </h3>
+
+                <form onSubmit={handleChangePassword} className="space-y-4">
+                  <div className="relative">
+                    <input
+                      type={showOld ? "text" : "password"}
+                      placeholder="Mật khẩu cũ"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 pr-11 outline-none transition focus:border-orange-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOld((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showOld ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showNew ? "text" : "password"}
+                      placeholder="Mật khẩu mới"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 pr-11 outline-none transition focus:border-orange-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showConfirm ? "text" : "password"}
+                      placeholder="Xác nhận mật khẩu mới"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full rounded-xl border px-4 py-3 pr-11 outline-none transition focus:border-orange-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+                    >
+                      {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  <button className="rounded-xl bg-slate-900 px-6 py-3 font-medium text-white transition hover:bg-slate-800">
+                    Đổi mật khẩu
+                  </button>
+                </form>
+              </div>
             </div>
-
-            {/* XÁC NHẬN MẬT KHẨU */}
-            <div className="relative">
-              <input
-                type={showConfirm ? "text" : "password"}
-                placeholder="Xác nhận mật khẩu mới"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border px-4 py-2 pr-10"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                aria-label={
-                  showConfirm
-                    ? "Hide confirm password"
-                    : "Show confirm password"
-                }
-              >
-                {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
-
-            <button className="bg-orange-600 text-white px-6 py-2">
-              Đổi mật khẩu
-            </button>
-          </form>
-        </div>
-
-        <div className="border-t pt-6">
-          <button
-            onClick={handleLogout}
-            className="bg-red-600 text-white px-6 py-2"
-          >
-            Đăng xuất
-          </button>
+          </div>
         </div>
       </div>
     </section>

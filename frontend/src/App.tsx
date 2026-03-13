@@ -30,6 +30,11 @@ import ProductList from "./pages/User/ProductList";
 import ProductDetail from "./pages/User/ProductDetail";
 import ProductListAdmin from "./pages/Admin/ProductList";
 import ProductForm from "./pages/Admin/ProductForm";
+import CheckoutPage from "./pages/CheckoutPage";
+import PaymentMomoResult from "./pages/PaymentMomoResult";
+import OrderHistoryPage from "./pages/User/OrderHistoryPage";
+import OrderDetailPage from "./pages/User/OrderDetailPage";
+import OrdersPage from "./pages/Admin/OrdersPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +75,42 @@ export default function App() {
               </PrivateRoute>
             }
           />
+
+          <Route
+            path="/checkout"
+            element={
+              <PrivateRoute>
+                <CheckoutPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/payment/momo"
+            element={
+              <PrivateRoute>
+                <PaymentMomoResult />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/account/orders"
+            element={
+              <PrivateRoute>
+                <OrderHistoryPage />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/account/orders/:id"
+            element={
+              <PrivateRoute>
+                <OrderDetailPage />
+              </PrivateRoute>
+            }
+          />
         </Route>
 
         <Route
@@ -86,12 +127,12 @@ export default function App() {
           </Route>
           <Route path="employees" element={<div>Quản lý nhân viên</div>} />
           <Route path="products" element={<ProductListAdmin />} />
-          <Route path="products/:id" element={<ProductForm />} />{" "}
+          <Route path="products/:id" element={<ProductForm />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="categories" element={<CategoriesPage />}>
             Quản lý danh mục
           </Route>
-          <Route path="orders" element={<div>Quản lý đơn hàng</div>} />
+          <Route path="orders" element={<OrdersPage />} />
           <Route path="coupon" element={<CouponsPage />}>
             Quản lý giảm giá
           </Route>

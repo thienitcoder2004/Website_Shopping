@@ -2,11 +2,36 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
     {
-        firstName: String,
-        lastName: String,
-        email: { type: String, unique: true },
-        phone: String,
-        password: String,
+        firstName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        lastName: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        email: {
+            type: String,
+            unique: true,
+            required: true,
+            trim: true,
+            lowercase: true,
+        },
+
+        phone: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        password: {
+            type: String,
+            default: "",
+        },
 
         role: {
             type: String,
@@ -23,6 +48,13 @@ const userSchema = new mongoose.Schema(
         address: {
             type: String,
             default: "",
+            trim: true,
+        },
+
+        avatar: {
+            type: String,
+            default: "/uploads/default-avatar.png",
+            trim: true,
         },
 
         isActive: {
@@ -30,8 +62,15 @@ const userSchema = new mongoose.Schema(
             default: true,
         },
 
-        resetToken: String,
-        resetTokenExpire: Date,
+        resetToken: {
+            type: String,
+            default: "",
+        },
+
+        resetTokenExpire: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true }
 );

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import type { CartItem } from "../types/cart.type";
 import { useCart } from "../context/cart.context";
 import { apiFile } from "../utils/apiFile";
@@ -13,61 +13,69 @@ function lineKey(it: CartItem) {
 }
 
 export default function ShoppingCart() {
+  const navigate = useNavigate();
   const { items, increase, decrease, removeItem } = useCart();
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    if (!items.length) {
-      setSelected({});
-      return;
-    }
-    setSelected((prev) => {
-      const next: Record<string, boolean> = {};
-      for (const it of items) {
-        const k = lineKey(it);
-        next[k] = prev[k] ?? true;
-      }
-      return next;
-    });
-  }, [items]);
 
   const allKeys = useMemo(() => items.map(lineKey), [items]);
 
   const allChecked = useMemo(() => {
     if (!allKeys.length) return false;
-    return allKeys.every((k) => selected[k]);
+    return allKeys.every((k) => selected[k] ?? true);
   }, [allKeys, selected]);
 
-  const someChecked = useMemo(
-    () => allKeys.some((k) => selected[k]),
-    [allKeys, selected],
-  );
+  const someChecked = useMemo(() => {
+    return allKeys.some((k) => selected[k] ?? true);
+  }, [allKeys, selected]);
 
-  const toggleAll = (v: boolean) => {
+  const toggleAll = (value: boolean) => {
     const next: Record<string, boolean> = {};
-    for (const k of allKeys) next[k] = v;
+    for (const k of allKeys) next[k] = value;
     setSelected(next);
   };
 
-  const toggleOne = (k: string, v: boolean) => {
-    setSelected((prev) => ({ ...prev, [k]: v }));
+  const toggleOne = (key: string, value: boolean) => {
+    setSelected((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
   };
 
-  const selectedItems = useMemo(
-    () => items.filter((it) => selected[lineKey(it)]),
-    [items, selected],
-  );
+  const selectedItems = useMemo(() => {
+    return items.filter((it) => selected[lineKey(it)] ?? true);
+  }, [items, selected]);
 
-  const totalSelected = useMemo(
-    () => selectedItems.reduce((sum, it) => sum + it.price * it.quantity, 0),
-    [selectedItems],
-  );
+  const totalSelected = useMemo(() => {
+    return selectedItems.reduce((sum, it) => sum + it.price * it.quantity, 0);
+  }, [selectedItems]);
 
   const removeSelected = () => {
     if (!someChecked) return;
     if (!window.confirm("Xóa các sản phẩm đã chọn?")) return;
-    for (const it of selectedItems) removeItem(it.id, it.variant);
+
+    for (const it of selectedItems) {
+      removeItem(it.id, it.variant);
+    }
+  };
+
+  const handleCheckout = () => {
+    if (!someChecked) return;
+
+    const checkoutItems = selectedItems.map((it) => ({
+      id: it.id,
+      name: it.name,
+      price: it.price,
+      quantity: it.quantity,
+      image: it.image,
+      variant: {
+        color: it.variant?.color || "",
+        size: it.variant?.size || "",
+      },
+    }));
+
+    localStorage.setItem("checkout_items", JSON.stringify(checkoutItems));
+    navigate("/checkout");
   };
 
   return (
@@ -126,12 +134,11 @@ export default function ShoppingCart() {
                       key={k}
                       className="px-4 py-4 hover:bg-gray-50/70 transition"
                     >
-                      {/* DESKTOP */}
                       <div className="hidden md:grid grid-cols-[44px_1fr_140px_160px_140px_140px] items-center gap-3">
                         <div className="flex items-center justify-center">
                           <input
                             type="checkbox"
-                            checked={!!selected[k]}
+                            checked={selected[k] ?? true}
                             onChange={(e) => toggleOne(k, e.target.checked)}
                             className="h-4 w-4"
                           />
@@ -212,12 +219,11 @@ export default function ShoppingCart() {
                         </div>
                       </div>
 
-                      {/* MOBILE */}
                       <div className="md:hidden">
                         <div className="flex items-start gap-3">
                           <input
                             type="checkbox"
-                            checked={!!selected[k]}
+                            checked={selected[k] ?? true}
                             onChange={(e) => toggleOne(k, e.target.checked)}
                             className="h-4 w-4 mt-1"
                           />
@@ -335,7 +341,7 @@ export default function ShoppingCart() {
                 <button
                   type="button"
                   disabled={!someChecked}
-                  onClick={() => alert("Bước tiếp theo: Checkout 😉")}
+                  onClick={handleCheckout}
                   className="px-6 py-3 rounded-md bg-orange-600 text-white font-bold hover:bg-orange-700 disabled:opacity-50 disabled:hover:bg-orange-600"
                 >
                   Mua Hàng

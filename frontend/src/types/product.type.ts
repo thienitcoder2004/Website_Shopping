@@ -13,8 +13,8 @@ export type TProduct = {
 
   images: string[];
 
-  categoryId?: TObjectId;   
-  brandId?: TObjectId;     
+  categoryId?: TObjectId;
+  brandId?: TObjectId;
 
   warehouseStock?: number;
   stock?: number;
@@ -24,6 +24,10 @@ export type TProduct = {
   colors?: string[];
   sizes?: string[];
   primaryImage?: string;
+
+  ratingAverage?: number;
+  ratingCount?: number;
+  reviewCount?: number;
 
   createdAt: string;
   updatedAt: string;

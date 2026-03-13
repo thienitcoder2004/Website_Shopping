@@ -2,31 +2,42 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, "uploads/");
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + "-" + file.originalname);
-    },
-});
-
-const productDir = path.join(process.cwd(), "uploads", "products");
-fs.mkdirSync(productDir, { recursive: true });
-
-const productStorage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, productDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const base = path.basename(file.originalname, ext).replace(/\s+/g, "-");
-        cb(null, `${base}-${Date.now()}${ext}`);
-    },
-});
-
+// ================= COMMON =================
 const imageFileFilter = (req, file, cb) => {
     const ok = ["image/jpeg", "image/png", "image/webp"].includes(file.mimetype);
     cb(ok ? null : new Error("Only jpg/png/webp allowed"), ok);
 };
+
+function buildStorage(dirPath) {
+    fs.mkdirSync(dirPath, { recursive: true });
+
+    return multer.diskStorage({
+        destination: (req, file, cb) => cb(null, dirPath),
+        filename: (req, file, cb) => {
+            const ext = path.extname(file.originalname).toLowerCase();
+            const base = path
+                .basename(file.originalname, ext)
+                .replace(/\s+/g, "-")
+                .replace(/[^a-zA-Z0-9-_]/g, "");
+
+            cb(null, `${base || "image"}-${Date.now()}${ext}`);
+        },
+    });
+}
+
+// ================= DEFAULT UPLOAD =================
+const defaultDir = path.join(process.cwd(), "uploads");
+const defaultStorage = buildStorage(defaultDir);
+
+const upload = multer({
+    storage: defaultStorage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// ================= PRODUCT IMAGES =================
+const productDir = path.join(process.cwd(), "uploads", "products");
+const productStorage = buildStorage(productDir);
 
 const uploadProductImages = multer({
     storage: productStorage,
@@ -34,5 +45,16 @@ const uploadProductImages = multer({
     limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-module.exports = multer({ storage });
+// ================= REVIEW IMAGES =================
+const reviewDir = path.join(process.cwd(), "uploads", "reviews");
+const reviewStorage = buildStorage(reviewDir);
+
+const uploadReviewImages = multer({
+    storage: reviewStorage,
+    fileFilter: imageFileFilter,
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+module.exports = upload;
 module.exports.uploadProductImages = uploadProductImages;
+module.exports.uploadReviewImages = uploadReviewImages;

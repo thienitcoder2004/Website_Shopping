@@ -44,9 +44,7 @@ export default function Login() {
     try {
       const result = await dispatch(login(form)).unwrap();
 
-      // NOTE: authSlice của bạn cũng đã lưu token vào localStorage (key "token").
-      // Nếu muốn chỉ 1 nơi, bạn có thể bỏ dòng dưới hoặc đổi cho đồng bộ.
-      localStorage.setItem("accessToken", result.token);
+      localStorage.setItem("token", result.token);
 
       toast.success("Đăng nhập thành công 🎉");
 
