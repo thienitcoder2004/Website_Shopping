@@ -1,11 +1,16 @@
-const express = require("express");
-const router = express.Router();
-
+const router = require("express").Router();
 const contactController = require("../controllers/contact.controller");
+const { protect, checkRole } = require("../middlewares/auth.middleware");
 
+// Public
 router.post("/", contactController.createContact);
-router.get("/", contactController.getContacts);
-router.put("/:id", contactController.updateContact);
-router.delete("/:id", contactController.deleteContact);
+
+// Admin + Staff
+router.get("/", protect, checkRole(["admin", "staff"]), contactController.getContacts);
+router.put("/:id", protect, checkRole(["admin", "staff"]), contactController.updateContact);
+router.patch("/:id/resolve", protect, checkRole(["admin", "staff"]), contactController.resolveContact);
+
+// Only Admin
+router.delete("/:id", protect, checkRole(["admin"]), contactController.deleteContact);
 
 module.exports = router;

@@ -1,8 +1,13 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import axios from "axios";
 
 interface User {
-  id: string;
+  id?: string;
+  _id?: string;
   email: string;
   role: string;
   firstName: string;
@@ -10,6 +15,9 @@ interface User {
   phone?: string;
   address?: string;
   avatar?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference?: "male" | "female" | "both";
 }
 
 interface AuthState {
@@ -35,6 +43,9 @@ type RegisterPayload = {
   email: string;
   phone: string;
   password: string;
+  dateOfBirth: string;
+  gender: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference: "male" | "female" | "both";
 };
 
 type UpdateProfilePayload = {
@@ -43,9 +54,13 @@ type UpdateProfilePayload = {
   phone?: string;
   address?: string;
   avatar?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference?: "male" | "female" | "both";
 };
 
 type UpdateProfileResponse = {
+  ok?: boolean;
   message: string;
   user: User;
 };
@@ -59,18 +74,37 @@ function safeParseJSON<T>(raw: string | null): T | null {
   }
 }
 
+function normalizeUser(user: User | null): User | null {
+  if (!user) return null;
+
+  return {
+    ...user,
+    role: String(user.role || "user").toLowerCase(),
+  };
+}
+
 function getAxiosErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const msg = err.response?.data?.message;
     if (typeof msg === "string" && msg.trim()) return msg;
-    if (typeof err.message === "string" && err.message.trim()) return err.message;
+    if (typeof err.message === "string" && err.message.trim()) {
+      return err.message;
+    }
   }
+
   if (err instanceof Error && err.message.trim()) return err.message;
   return fallback;
 }
 
+function getProfileEndpointByRole(role?: string) {
+  const normalizedRole = String(role || "").toLowerCase();
+  return normalizedRole === "staff" || normalizedRole === "admin"
+    ? "http://localhost:5000/api/staff/me"
+    : "http://localhost:5000/api/users/me";
+}
+
 const initialState: AuthState = {
-  user: safeParseJSON<User>(localStorage.getItem("user")),
+  user: normalizeUser(safeParseJSON<User>(localStorage.getItem("user"))),
   token: localStorage.getItem("token"),
   loading: false,
   error: null,
@@ -114,21 +148,20 @@ export const updateProfile = createAsyncThunk<
   { state: { auth: AuthState }; rejectValue: string }
 >("auth/updateProfile", async (data, { getState, rejectWithValue }) => {
   try {
-    const token = getState().auth.token;
+    const state = getState().auth;
+    const token = state.token;
 
     if (!token) {
       return rejectWithValue("Bạn chưa đăng nhập");
     }
 
-    const res = await axios.put<UpdateProfileResponse>(
-      "http://localhost:5000/api/auth/update-profile",
-      data,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+    const endpoint = getProfileEndpointByRole(state.user?.role);
+
+    const res = await axios.put<UpdateProfileResponse>(endpoint, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-    );
+    });
 
     return res.data;
   } catch (err: unknown) {
@@ -144,22 +177,22 @@ export const getProfile = createAsyncThunk<
   { state: { auth: AuthState }; rejectValue: string }
 >("auth/getProfile", async (_, { getState, rejectWithValue }) => {
   try {
-    const token = getState().auth.token;
+    const state = getState().auth;
+    const token = state.token;
 
     if (!token) {
       return rejectWithValue("Bạn chưa đăng nhập");
     }
 
-    const res = await axios.get<{ user: User }>(
-      "http://localhost:5000/api/auth/profile",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    );
+    const endpoint = getProfileEndpointByRole(state.user?.role);
 
-    return res.data;
+    const res = await axios.get<{ ok?: boolean; user: User }>(endpoint, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return { user: res.data.user };
   } catch (err: unknown) {
     return rejectWithValue(
       getAxiosErrorMessage(err, "Lấy thông tin tài khoản thất bại"),
@@ -186,27 +219,28 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-
-      /* LOGIN */
       .addCase(login.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(login.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
-        state.loading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-        state.error = null;
+      .addCase(
+        login.fulfilled,
+        (state, action: PayloadAction<AuthResponse>) => {
+          state.loading = false;
+          state.user = normalizeUser(action.payload.user);
+          state.token = action.payload.token;
+          state.error = null;
 
-        localStorage.setItem("token", action.payload.token);
-        localStorage.setItem("user", JSON.stringify(action.payload.user));
-      })
+          localStorage.setItem("token", action.payload.token);
+          localStorage.setItem("user", JSON.stringify(state.user));
+        },
+      )
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? action.error.message ?? "Đăng nhập thất bại";
+        state.error =
+          action.payload ?? action.error.message ?? "Đăng nhập thất bại";
       })
 
-      /* REGISTER */
       .addCase(register.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -215,20 +249,20 @@ const authSlice = createSlice({
         register.fulfilled,
         (state, action: PayloadAction<AuthResponse>) => {
           state.loading = false;
-          state.user = action.payload.user;
+          state.user = normalizeUser(action.payload.user);
           state.token = action.payload.token;
           state.error = null;
 
           localStorage.setItem("token", action.payload.token);
-          localStorage.setItem("user", JSON.stringify(action.payload.user));
+          localStorage.setItem("user", JSON.stringify(state.user));
         },
       )
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? action.error.message ?? "Đăng ký thất bại";
+        state.error =
+          action.payload ?? action.error.message ?? "Đăng ký thất bại";
       })
 
-      /* GET PROFILE */
       .addCase(getProfile.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -237,19 +271,20 @@ const authSlice = createSlice({
         getProfile.fulfilled,
         (state, action: PayloadAction<{ user: User }>) => {
           state.loading = false;
-          state.user = action.payload.user;
+          state.user = normalizeUser(action.payload.user);
           state.error = null;
 
-          localStorage.setItem("user", JSON.stringify(action.payload.user));
+          localStorage.setItem("user", JSON.stringify(state.user));
         },
       )
       .addCase(getProfile.rejected, (state, action) => {
         state.loading = false;
         state.error =
-          action.payload ?? action.error.message ?? "Lấy thông tin tài khoản thất bại";
+          action.payload ??
+          action.error.message ??
+          "Lấy thông tin tài khoản thất bại";
       })
 
-      /* UPDATE PROFILE */
       .addCase(updateProfile.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -258,16 +293,18 @@ const authSlice = createSlice({
         updateProfile.fulfilled,
         (state, action: PayloadAction<UpdateProfileResponse>) => {
           state.loading = false;
-          state.user = action.payload.user;
+          state.user = normalizeUser(action.payload.user);
           state.error = null;
 
-          localStorage.setItem("user", JSON.stringify(action.payload.user));
+          localStorage.setItem("user", JSON.stringify(state.user));
         },
       )
       .addCase(updateProfile.rejected, (state, action) => {
         state.loading = false;
         state.error =
-          action.payload ?? action.error.message ?? "Cập nhật thông tin thất bại";
+          action.payload ??
+          action.error.message ??
+          "Cập nhật thông tin thất bại";
       });
   },
 });

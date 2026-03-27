@@ -50,6 +50,7 @@ const ProductReviewSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
 
     helpfulCount: {
@@ -63,6 +64,22 @@ const ProductReviewSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+
+    replyCount: {
+      type: Number,
+      default: 0,
+    },
+
+    hasStaffReply: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    lastRepliedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

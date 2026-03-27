@@ -3,7 +3,11 @@ const router = require("express").Router();
 const productController = require("../controllers/product.controller");
 const productReviewController = require("../controllers/productReview.controller");
 
-const { protect } = require("../middlewares/auth.middleware");
+const {
+  protect,
+  checkRole,
+} = require("../middlewares/auth.middleware");
+
 const { uploadReviewImages } = require("../middlewares/upload.middleware");
 
 // ================= PRODUCT REVIEW =================
@@ -19,10 +23,11 @@ router.post(
   productReviewController.createReview
 );
 
-// Login required: trả lời review
+// Admin + Staff: trả lời review
 router.post(
   "/:id/reviews/:reviewId/replies",
   protect,
+  checkRole(["admin", "staff"]),
   uploadReviewImages.array("images", 3),
   productReviewController.createReply
 );
@@ -36,11 +41,32 @@ router.post(
 
 // ================= PRODUCT =================
 
+// Public
 router.get("/slug/:slug", productController.getBySlug);
 router.get("/", productController.list);
 router.get("/:id", productController.getById);
-router.post("/", productController.create);
-router.put("/:id", productController.update);
-router.delete("/:id", productController.remove);
+
+// Admin + Staff
+router.post(
+  "/",
+  protect,
+  checkRole(["admin", "staff"]),
+  productController.create
+);
+
+router.put(
+  "/:id",
+  protect,
+  checkRole(["admin", "staff"]),
+  productController.update
+);
+
+// Only Admin
+router.delete(
+  "/:id",
+  protect,
+  checkRole(["admin"]),
+  productController.remove
+);
 
 module.exports = router;

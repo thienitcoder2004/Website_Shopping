@@ -1,20 +1,29 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import axios, { AxiosError } from "axios";
 
-type ContactStatus = "new" | "resolved";
+type ContactStatus = "pending" | "resolved";
 
 export type TContact = {
   _id: string;
-  fullName: string;
+  name: string;
   email: string;
   phone: string;
+  subject?: string;
   message: string;
   status: ContactStatus;
   createdAt?: string;
   updatedAt?: string;
 };
 
-type ContactUpdatePayload = Pick<TContact, "fullName" | "email" | "message">;
+type ContactUpdatePayload = Pick<
+  TContact,
+  "name" | "email" | "phone" | "subject" | "message" | "status"
+>;
+
+type ContactsResponse = {
+  ok?: boolean;
+  contacts?: TContact[];
+};
 
 function getErrorMessage(err: unknown) {
   if (axios.isAxiosError(err)) {
@@ -34,26 +43,28 @@ export default function ContactsPage() {
     return token ? { Authorization: `Bearer ${token}` } : undefined;
   }, [token]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const res = await axios.get<TContact[]>(
+      const res = await axios.get<ContactsResponse>(
         "http://localhost:5000/api/contacts",
         {
           headers: authHeaders,
         },
       );
 
-      // nếu backend trả {data: ...} thì đổi thành: setContacts(res.data.data)
-      setContacts(res.data);
+      setContacts(Array.isArray(res.data?.contacts) ? res.data.contacts : []);
     } catch (err) {
       alert(getErrorMessage(err));
     }
-  };
+  }, [authHeaders]);
 
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [fetchData]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -83,9 +94,12 @@ export default function ContactsPage() {
     if (!editing) return;
 
     const payload: ContactUpdatePayload = {
-      fullName: editing.fullName,
+      name: editing.name,
       email: editing.email,
+      phone: editing.phone,
+      subject: editing.subject || "",
       message: editing.message,
+      status: editing.status,
     };
 
     try {
@@ -127,19 +141,19 @@ export default function ContactsPage() {
                   key={c._id}
                   className="border-t hover:bg-gray-50 transition"
                 >
-                  <td className="p-3">{c.fullName}</td>
+                  <td className="p-3">{c.name}</td>
                   <td className="p-3">{c.email}</td>
                   <td className="p-3">{c.phone}</td>
 
                   <td className="p-3">
                     <span
                       className={`px-3 py-1 text-xs rounded-full ${
-                        c.status === "new"
+                        c.status === "pending"
                           ? "bg-red-100 text-red-600"
                           : "bg-green-100 text-green-600"
                       }`}
                     >
-                      {c.status === "new" ? "Mới" : "Đã xử lý"}
+                      {c.status === "pending" ? "Mới" : "Đã xử lý"}
                     </span>
                   </td>
 
@@ -158,7 +172,7 @@ export default function ContactsPage() {
                       Xóa
                     </button>
 
-                    {c.status === "new" && (
+                    {c.status === "pending" && (
                       <button
                         onClick={() => handleResolve(c._id)}
                         className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm"
@@ -182,7 +196,6 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* MODAL EDIT */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-[420px]">
@@ -193,10 +206,10 @@ export default function ContactsPage() {
             <label className="text-sm text-slate-600">Họ tên</label>
             <input
               className="w-full border p-2 mb-3 rounded-lg"
-              value={editing.fullName}
+              value={editing.name}
               onChange={(e) =>
                 setEditing((prev) =>
-                  prev ? { ...prev, fullName: e.target.value } : prev,
+                  prev ? { ...prev, name: e.target.value } : prev,
                 )
               }
             />
@@ -208,6 +221,28 @@ export default function ContactsPage() {
               onChange={(e) =>
                 setEditing((prev) =>
                   prev ? { ...prev, email: e.target.value } : prev,
+                )
+              }
+            />
+
+            <label className="text-sm text-slate-600">Số điện thoại</label>
+            <input
+              className="w-full border p-2 mb-3 rounded-lg"
+              value={editing.phone}
+              onChange={(e) =>
+                setEditing((prev) =>
+                  prev ? { ...prev, phone: e.target.value } : prev,
+                )
+              }
+            />
+
+            <label className="text-sm text-slate-600">Chủ đề</label>
+            <input
+              className="w-full border p-2 mb-3 rounded-lg"
+              value={editing.subject || ""}
+              onChange={(e) =>
+                setEditing((prev) =>
+                  prev ? { ...prev, subject: e.target.value } : prev,
                 )
               }
             />

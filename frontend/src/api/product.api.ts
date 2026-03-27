@@ -1,11 +1,16 @@
 import type { TPagination, TProduct } from "../types/product.type";
 import axiosClient from "./axios.config";
 
+export type { TProduct };
+
 export type ProductListParams = {
   q?: string;
   page?: number;
   limit?: number;
   isActive?: boolean | "true" | "false";
+  sort?: string;
+  categoryId?: string;
+  categorySlug?: string;
 };
 
 export type TProductReviewReply = {
@@ -38,6 +43,53 @@ export type TProductReview = {
   updatedAt: string;
   replies: TProductReviewReply[];
   helpfulCount?: number;
+  replyCount?: number;
+  hasStaffReply?: boolean;
+};
+
+export type TAdminReviewItem = TProductReview & {
+  productId:
+    | string
+    | {
+        _id: string;
+        name: string;
+        slug: string;
+        primaryImage?: string;
+        images?: string[];
+        ratingAverage?: number;
+        ratingCount?: number;
+        reviewCount?: number;
+      };
+  userId:
+    | string
+    | {
+        _id: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        avatar?: string;
+        role?: string;
+      };
+};
+
+export type AdminReviewQuery = {
+  productId?: string;
+  unreplied?: boolean | "true" | "false";
+  rating?: number;
+  keyword?: string;
+  page?: number;
+  limit?: number;
+  isActive?: boolean | "true" | "false";
+};
+
+export type AdminReviewListResponse = {
+  items: TAdminReviewItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 };
 
 export const productApi = {
@@ -117,5 +169,24 @@ export const productApi = {
         helpfulCount: number;
       };
     }>(`/products/reviews/${reviewId}/helpful`);
+  },
+
+  getAdminReviews(params?: AdminReviewQuery) {
+    return axiosClient.get<{ ok: boolean; data: AdminReviewListResponse }>(
+      "/admin/reviews",
+      { params },
+    );
+  },
+
+  toggleReviewActive(reviewId: string) {
+    return axiosClient.patch<{ ok: boolean; message?: string; data?: TAdminReviewItem }>(
+      `/admin/reviews/${reviewId}/toggle-active`,
+    );
+  },
+
+  deleteReview(reviewId: string) {
+    return axiosClient.delete<{ ok: boolean; message?: string; data?: { deleted: boolean } }>(
+      `/admin/reviews/${reviewId}`,
+    );
   },
 };

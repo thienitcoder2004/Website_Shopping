@@ -1,50 +1,46 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getCategories,
   deleteCategory,
   createCategory,
   updateCategory,
 } from "../../api/category.api";
-import Pagination from "../../components/Pagination";
+import Pagination from "../../components/common/Pagination";
 
 type Category = {
   _id: string;
   name: string;
   slug?: string;
   description?: string;
+  image?: string;
   isActive?: boolean;
+  parentId?: {
+    _id?: string;
+    name?: string;
+    slug?: string;
+  } | null;
   createdAt?: string;
   updatedAt?: string;
 };
 
 type CategoryPayload = {
   name: string;
-  slug: string;
   description?: string;
+  image?: string;
+  parentId?: string | null;
+  isActive?: boolean;
 };
 
-type ApiResponse<T> = {
-  data?: T;
-  total?: number;
-  totalPages?: number;
-  page?: number;
-  limit?: number;
-};
+type CategoriesResponse =
+  | Category[]
+  | {
+      ok?: boolean;
+      categories?: Category[];
+    };
 
 type HttpResponse<T> = {
   data: T;
 };
-
-function slugify(input: string) {
-  return input
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-");
-}
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -58,39 +54,46 @@ export default function CategoriesPage() {
   const [formData, setFormData] = useState<{
     name: string;
     description: string;
-  }>({ name: "", description: "" });
+    image: string;
+    parentId: string;
+    isActive: boolean;
+  }>({
+    name: "",
+    description: "",
+    image: "",
+    parentId: "",
+    isActive: true,
+  });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  const fetchData = async () => {
-    const res = (await getCategories()) as unknown as HttpResponse<
-      Category[] | ApiResponse<Category[]>
-    >;
-
+  const fetchData = useCallback(async () => {
+    const res = (await getCategories()) as unknown as HttpResponse<CategoriesResponse>;
     const data = res.data;
 
     const list: Category[] = Array.isArray(data)
       ? data
-      : Array.isArray(data.data)
-        ? data.data
+      : Array.isArray(data.categories)
+        ? data.categories
         : [];
 
     setCategories(list);
-  };
+  }, []);
 
   useEffect(() => {
-    void (async () => {
-      await fetchData();
-    })();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [fetchData]);
 
   const totalPages = useMemo(() => {
     const n = Math.ceil(categories.length / itemsPerPage);
     return Math.max(1, n);
   }, [categories.length]);
 
-  // ✅ Không setState trong effect nữa, clamp ngay đây:
   const safePage = useMemo(
     () => clamp(currentPage, 1, totalPages),
     [currentPage, totalPages],
@@ -102,8 +105,19 @@ export default function CategoriesPage() {
     return categories.slice(start, end);
   }, [categories, safePage]);
 
+  const parentOptions = useMemo(() => {
+    if (!editingId) return categories;
+    return categories.filter((cat) => cat._id !== editingId);
+  }, [categories, editingId]);
+
   const resetForm = () => {
-    setFormData({ name: "", description: "" });
+    setFormData({
+      name: "",
+      description: "",
+      image: "",
+      parentId: "",
+      isActive: true,
+    });
     setEditingId(null);
   };
 
@@ -115,66 +129,83 @@ export default function CategoriesPage() {
   const handleEdit = (cat: Category) => {
     setEditingId(cat._id);
     setFormData({
-      name: cat.name ?? "",
-      description: cat.description ?? "",
+      name: cat.name || "",
+      description: cat.description || "",
+      image: cat.image || "",
+      parentId: cat.parentId?._id || "",
+      isActive: cat.isActive !== false,
     });
     setShowModal(true);
   };
 
-  const handleSubmit = async () => {
-    const name = formData.name.trim();
-    const description = formData.description.trim();
+  const handleDelete = async (id: string) => {
+    const ok = window.confirm("Bạn có chắc muốn xóa danh mục này?");
+    if (!ok) return;
 
-    if (!name) {
+    try {
+      await deleteCategory(id);
+      await fetchData();
+    } catch (error) {
+      console.error(error);
+      alert("Xóa danh mục thất bại");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.name.trim()) {
       alert("Vui lòng nhập tên danh mục");
       return;
     }
 
     const payload: CategoryPayload = {
-      name,
-      slug: slugify(name),
-      description: description || undefined,
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      image: formData.image.trim(),
+      parentId: formData.parentId || null,
+      isActive: formData.isActive,
     };
 
-    if (editingId) {
-      await updateCategory(editingId, payload);
-    } else {
-      await createCategory(payload);
+    try {
+      if (editingId) {
+        await updateCategory(editingId, payload);
+      } else {
+        await createCategory(payload);
+      }
+
+      setShowModal(false);
+      resetForm();
+      await fetchData();
+    } catch (error) {
+      console.error(error);
+      alert(editingId ? "Cập nhật thất bại" : "Thêm danh mục thất bại");
     }
-
-    setShowModal(false);
-    resetForm();
-    await fetchData();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Bạn có chắc muốn xóa?")) return;
-    await deleteCategory(id);
-    await fetchData();
   };
 
   return (
-    <div className="p-8 bg-gray-50">
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-slate-800">
-          Quản lý Danh Mục
-        </h2>
+    <div className="rounded-2xl bg-white p-6 shadow-lg">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Quản lý danh mục</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Quản lý danh mục sản phẩm trong hệ thống
+          </p>
+        </div>
 
         <button
           onClick={openCreate}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-md transition"
+          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
         >
-          + Thêm Danh Mục
+          + Thêm danh mục
         </button>
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-gray-100 text-gray-600 text-sm uppercase">
+      <div className="overflow-hidden rounded-xl border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-gray-50 text-xs uppercase tracking-wider text-gray-600">
             <tr>
-              <th className="px-6 py-4">Tên</th>
+              <th className="px-6 py-4">Tên danh mục</th>
+              <th className="px-6 py-4">Slug</th>
+              <th className="px-6 py-4">Danh mục cha</th>
               <th className="px-6 py-4">Mô tả</th>
               <th className="px-6 py-4">Trạng thái</th>
               <th className="px-6 py-4 text-center">Hành động</th>
@@ -183,19 +214,18 @@ export default function CategoriesPage() {
 
           <tbody>
             {currentItems.map((cat) => (
-              <tr
-                key={cat._id}
-                className="border-t hover:bg-gray-50 transition"
-              >
-                <td className="px-6 py-4 font-medium text-gray-800">
-                  {cat.name}
+              <tr key={cat._id} className="border-t">
+                <td className="px-6 py-4 font-medium text-slate-800">{cat.name}</td>
+                <td className="px-6 py-4 text-gray-500">{cat.slug || "-"}</td>
+                <td className="px-6 py-4 text-gray-500">
+                  {cat.parentId?.name || "-"}
                 </td>
                 <td className="px-6 py-4 text-gray-500">
                   {cat.description || "-"}
                 </td>
                 <td className="px-6 py-4">
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       cat.isActive !== false
                         ? "bg-green-100 text-green-700"
                         : "bg-red-100 text-red-600"
@@ -209,13 +239,13 @@ export default function CategoriesPage() {
                   <div className="flex justify-center gap-3">
                     <button
                       onClick={() => handleEdit(cat)}
-                      className="bg-yellow-400 hover:bg-yellow-500 text-white px-3 py-1 rounded-md text-sm"
+                      className="rounded-md bg-yellow-400 px-3 py-1 text-sm text-white hover:bg-yellow-500"
                     >
                       Sửa
                     </button>
                     <button
                       onClick={() => handleDelete(cat._id)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm"
+                      className="rounded-md bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
                     >
                       Xóa
                     </button>
@@ -226,10 +256,7 @@ export default function CategoriesPage() {
 
             {!currentItems.length && (
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-6 py-10 text-center text-gray-500"
-                >
+                <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
                   Chưa có danh mục
                 </td>
               </tr>
@@ -238,56 +265,98 @@ export default function CategoriesPage() {
         </table>
       </div>
 
-      {/* PAGINATION */}
       <Pagination
         currentPage={safePage}
         totalPages={totalPages}
         onPageChange={(p) => setCurrentPage(clamp(p, 1, totalPages))}
       />
 
-      {/* MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-[400px] rounded-xl shadow-xl p-6">
-            <h3 className="text-lg font-semibold mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-[460px] rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="mb-4 text-lg font-semibold">
               {editingId ? "Sửa Danh Mục" : "Thêm Danh Mục"}
             </h3>
 
-            <input
-              type="text"
-              placeholder="Tên danh mục"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData((s) => ({ ...s, name: e.target.value }))
-              }
-              className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Tên danh mục"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
+                className="w-full rounded-lg border px-3 py-2 outline-none focus:border-blue-500"
+              />
 
-            <textarea
-              placeholder="Mô tả"
-              value={formData.description}
-              onChange={(e) =>
-                setFormData((s) => ({ ...s, description: e.target.value }))
-              }
-              className="w-full border rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+              <textarea
+                placeholder="Mô tả"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                className="min-h-[100px] w-full rounded-lg border px-3 py-2 outline-none focus:border-blue-500"
+              />
 
-            <div className="flex justify-end gap-3">
+              <input
+                type="text"
+                placeholder="Ảnh danh mục (URL nếu có)"
+                value={formData.image}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, image: e.target.value }))
+                }
+                className="w-full rounded-lg border px-3 py-2 outline-none focus:border-blue-500"
+              />
+
+              <select
+                value={formData.parentId}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, parentId: e.target.value }))
+                }
+                className="w-full rounded-lg border px-3 py-2 outline-none focus:border-blue-500"
+              >
+                <option value="">Không có danh mục cha</option>
+                {parentOptions.map((cat) => (
+                  <option key={cat._id} value={cat._id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={formData.isActive}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isActive: e.target.checked,
+                    }))
+                  }
+                />
+                Hiển thị danh mục
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-lg"
+                className="rounded-lg bg-gray-200 px-4 py-2 hover:bg-gray-300"
               >
                 Hủy
               </button>
 
               <button
-                onClick={handleSubmit}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                onClick={() => void handleSubmit()}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
               >
-                {editingId ? "Cập nhật" : "Tạo mới"}
+                {editingId ? "Cập nhật" : "Thêm mới"}
               </button>
             </div>
           </div>

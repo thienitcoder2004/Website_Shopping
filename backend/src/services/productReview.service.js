@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const ProductReview = require("../models/ProductReview");
 const User = require("../models/User");
+const Order = require("../models/sales/Order");
 
 function isValidObjectId(id) {
   return mongoose.Types.ObjectId.isValid(id);
@@ -20,12 +21,11 @@ function buildDisplayName(user) {
 }
 
 function buildAvatar(user) {
-  return user?.avatar || user?.profileImage || user?.photoURL || "";
+  return user?.avatar || user?.profileImage || user?.photoURL || "/uploads/default-avatar.png";
 }
 
 function mapImagesFromFiles(files) {
   if (!Array.isArray(files) || files.length === 0) return [];
-
   return files.map((file) => `/uploads/reviews/${file.filename}`);
 }
 
@@ -43,18 +43,36 @@ async function ensureProductExists(productId) {
 }
 
 async function ensureUserExists(authUser) {
-  const userId = authUser?._id || authUser?.id;
+  const userId = authUser?._id || authUser?.id || authUser?.userId;
 
   if (!userId || !isValidObjectId(userId)) {
     throw new Error("UNAUTHORIZED");
   }
 
   const user = await User.findById(userId).lean();
-  if (!user) {
+  if (!user || user.isActive === false) {
     throw new Error("UNAUTHORIZED");
   }
 
   return user;
+}
+
+function isStaffOrAdmin(user) {
+  return ["admin", "staff"].includes(String(user?.role || ""));
+}
+
+async function ensurePurchasedProduct(userId, productId) {
+  const order = await Order.findOne({
+    userId,
+    orderStatus: "SUCCESS",
+    "items.productId": productId,
+  }).lean();
+
+  if (!order) {
+    throw new Error("PRODUCT_NOT_PURCHASED");
+  }
+
+  return order;
 }
 
 async function recalcProductRating(productId) {
@@ -128,7 +146,7 @@ exports.getByProduct = async (productId) => {
   })
     .populate(
       "userId",
-      "firstName lastName name fullName email avatar profileImage photoURL",
+      "firstName lastName email avatar role"
     )
     .sort({ createdAt: -1 })
     .lean();
@@ -142,8 +160,11 @@ exports.getByProduct = async (productId) => {
       displayName: user
         ? buildDisplayName(user)
         : item.displayName || "Người dùng",
-      avatar: user ? buildAvatar(user) : "",
+      avatar: user ? buildAvatar(user) : "/uploads/default-avatar.png",
       helpfulCount: item.helpfulCount || 0,
+      replyCount: item.replyCount || 0,
+      hasStaffReply: item.hasStaffReply || false,
+      role: user?.role || null,
     };
   });
 
@@ -153,6 +174,8 @@ exports.getByProduct = async (productId) => {
 exports.createReview = async (productId, body, authUser, files) => {
   const product = await ensureProductExists(productId);
   const user = await ensureUserExists(authUser);
+
+  await ensurePurchasedProduct(user._id, product._id);
 
   const comment = normalizeComment(body.comment);
   const rating = Number(body.rating);
@@ -193,12 +216,18 @@ exports.createReview = async (productId, body, authUser, files) => {
     ...doc.toObject(),
     avatar: buildAvatar(user),
     helpfulCount: 0,
+    replyCount: 0,
+    hasStaffReply: false,
   };
 };
 
 exports.createReply = async (productId, reviewId, body, authUser, files) => {
   const product = await ensureProductExists(productId);
   const user = await ensureUserExists(authUser);
+
+  if (!isStaffOrAdmin(user)) {
+    throw new Error("FORBIDDEN");
+  }
 
   if (!isValidObjectId(reviewId)) {
     throw new Error("REVIEW_NOT_FOUND");
@@ -207,6 +236,7 @@ exports.createReply = async (productId, reviewId, body, authUser, files) => {
   const parentReview = await ProductReview.findOne({
     _id: reviewId,
     productId: product._id,
+    parentId: null,
     isActive: true,
   });
 
@@ -230,6 +260,11 @@ exports.createReply = async (productId, reviewId, body, authUser, files) => {
     images,
     displayName: buildDisplayName(user),
   });
+
+  parentReview.replyCount = Number(parentReview.replyCount || 0) + 1;
+  parentReview.hasStaffReply = true;
+  parentReview.lastRepliedAt = new Date();
+  await parentReview.save();
 
   return {
     ...doc.toObject(),
@@ -259,7 +294,7 @@ exports.markHelpful = async (reviewId, authUser) => {
   }
 
   const alreadyMarked = review.helpfulBy.some(
-    (id) => String(id) === String(user._id),
+    (id) => String(id) === String(user._id)
   );
 
   if (alreadyMarked) {
@@ -275,4 +310,110 @@ exports.markHelpful = async (reviewId, authUser) => {
     reviewId: review._id,
     helpfulCount: review.helpfulCount,
   };
+};
+
+exports.getAdminReviews = async (query = {}) => {
+  const {
+    productId,
+    unreplied,
+    rating,
+    keyword,
+    page = 1,
+    limit = 10,
+    isActive,
+  } = query;
+
+  const filter = {
+    parentId: null,
+  };
+
+  if (productId && isValidObjectId(productId)) {
+    filter.productId = productId;
+  }
+
+  if (unreplied === "true") {
+    filter.hasStaffReply = false;
+  }
+
+  if (rating && Number(rating) >= 1 && Number(rating) <= 5) {
+    filter.rating = Number(rating);
+  }
+
+  if (typeof isActive !== "undefined") {
+    filter.isActive = String(isActive) === "true";
+  }
+
+  if (keyword) {
+    filter.$or = [
+      { comment: { $regex: keyword, $options: "i" } },
+      { displayName: { $regex: keyword, $options: "i" } },
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [items, total] = await Promise.all([
+    ProductReview.find(filter)
+      .populate("productId", "name slug primaryImage images ratingAverage ratingCount reviewCount")
+      .populate("userId", "firstName lastName email avatar role")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit))
+      .lean(),
+    ProductReview.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages: Math.ceil(total / Number(limit)),
+    },
+  };
+};
+
+exports.toggleReviewActive = async (reviewId) => {
+  if (!isValidObjectId(reviewId)) {
+    throw new Error("REVIEW_NOT_FOUND");
+  }
+
+  const review = await ProductReview.findById(reviewId);
+
+  if (!review || review.parentId) {
+    throw new Error("REVIEW_NOT_FOUND");
+  }
+
+  review.isActive = !review.isActive;
+  await review.save();
+
+  await ProductReview.updateMany(
+    { parentId: review._id },
+    { $set: { isActive: review.isActive } }
+  );
+
+  await recalcProductRating(review.productId);
+
+  return review;
+};
+
+exports.deleteReview = async (reviewId) => {
+  if (!isValidObjectId(reviewId)) {
+    throw new Error("REVIEW_NOT_FOUND");
+  }
+
+  const review = await ProductReview.findById(reviewId);
+
+  if (!review || review.parentId) {
+    throw new Error("REVIEW_NOT_FOUND");
+  }
+
+  await ProductReview.deleteMany({
+    $or: [{ _id: review._id }, { parentId: review._id }],
+  });
+
+  await recalcProductRating(review.productId);
+
+  return { deleted: true };
 };

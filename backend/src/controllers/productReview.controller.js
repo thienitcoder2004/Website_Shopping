@@ -36,6 +36,8 @@ exports.createReview = async (req, res) => {
 
     if (e.message === "PRODUCT_NOT_FOUND") code = 404;
     if (e.message === "UNAUTHORIZED") code = 401;
+    if (e.message === "PRODUCT_NOT_PURCHASED") code = 403;
+    if (e.message === "ALREADY_REVIEWED") code = 409;
 
     return res.status(code).json({
       ok: false,
@@ -70,6 +72,10 @@ exports.createReply = async (req, res) => {
 
     if (e.message === "UNAUTHORIZED") {
       code = 401;
+    }
+
+    if (e.message === "FORBIDDEN") {
+      code = 403;
     }
 
     return res.status(code).json({

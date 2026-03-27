@@ -1,6 +1,6 @@
 import type React from "react";
 import { useSelector } from "react-redux";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import type { RootState } from "../stores/store";
 
 type AdminRouteProps = {
@@ -9,10 +9,18 @@ type AdminRouteProps = {
 
 export default function AdminRoute({ children }: AdminRouteProps) {
   const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
+  const location = useLocation();
 
-  if (!user) return <Navigate to="/login" replace />;
+  if (!token || !user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
 
-  if (user.role !== "admin") return <Navigate to="/" replace />;
+  const role = String(user.role || "").toLowerCase();
+
+  if (!["admin", "staff"].includes(role)) {
+    return <Navigate to="/" replace />;
+  }
 
   return <>{children}</>;
 }
