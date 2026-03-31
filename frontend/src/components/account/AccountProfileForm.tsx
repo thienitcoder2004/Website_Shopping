@@ -3,10 +3,7 @@ import axios from "axios";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useVietnamAddress } from "../../hooks/useVietnamAddress";
-import {
-  API_BASE,
-  getAxiosErrorMessage,
-} from "../../utils/account.utils";
+import { API_BASE, getAxiosErrorMessage } from "../../utils/account.utils";
 
 type UserLike = {
   address?: string;
@@ -156,7 +153,7 @@ export default function AccountProfileForm({
   };
 
   const handleChangeProfileField = (
-    e: React.ChangeEvent<HTMLSelectElement>
+    e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     setProfileForm((prev) => ({
       ...prev,
@@ -176,7 +173,9 @@ export default function AccountProfileForm({
       (provinceCode || districtCode || wardCode || detailAddress.trim()) &&
       (!provinceCode || !districtCode || !wardCode || !detailAddress.trim())
     ) {
-      toast.error("Vui lòng chọn đầy đủ tỉnh, quận, phường và nhập số nhà/tên đường");
+      toast.error(
+        "Vui lòng chọn đầy đủ tỉnh, quận, phường và nhập số nhà/tên đường",
+      );
       return;
     }
 
@@ -309,9 +308,7 @@ export default function AccountProfileForm({
               disabled={!districtCode || loadingWardData}
             >
               <option value="">
-                {loadingWardData
-                  ? "Đang tải phường/xã..."
-                  : "Chọn Phường / Xã"}
+                {loadingWardData ? "Đang tải phường/xã..." : "Chọn Phường / Xã"}
               </option>
               {wards.map((w) => (
                 <option key={w.code} value={String(w.code)}>
@@ -330,7 +327,9 @@ export default function AccountProfileForm({
           </div>
 
           <div className="mt-4 rounded-2xl border border-orange-100 bg-orange-50 px-4 py-3">
-            <p className="text-sm font-semibold text-orange-700">Địa chỉ đầy đủ</p>
+            <p className="text-sm font-semibold text-orange-700">
+              Địa chỉ đầy đủ
+            </p>
             <p className="mt-1 text-sm text-slate-700">
               {fullAddress || "Bạn chưa chọn/nhập địa chỉ mới"}
             </p>

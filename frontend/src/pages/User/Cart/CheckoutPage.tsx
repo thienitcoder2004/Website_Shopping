@@ -9,7 +9,7 @@ import { useCart } from "../../../context/cart.context";
 import CheckoutCouponBox from "../../../components/CheckoutPage/CheckoutCouponBox";
 import CheckoutForm from "../../../components/CheckoutPage/CheckoutForm";
 import CheckoutSummary from "../../../components/CheckoutPage/CheckoutSummary";
-import { updateProfile } from "../../../stores/authSlice";
+import { getProfile, updateProfile } from "../../../stores/authSlice";
 import type { AppDispatch, RootState } from "../../../stores/store";
 
 type CheckoutCartItem = {
@@ -68,6 +68,7 @@ function getErrorMessage(error: unknown, fallback: string) {
     if (typeof message === "string" && message.trim()) {
       return message;
     }
+
     if (typeof error.message === "string" && error.message.trim()) {
       return error.message;
     }
@@ -89,15 +90,13 @@ function isValidVietnamesePhone(value: string) {
   return /^(0|\+84)(3|5|7|8|9)\d{8}$/.test(phone);
 }
 
-function getAccountFullName(user?: {
-  firstName?: string;
-  lastName?: string;
-}) {
+function getAccountFullName(user?: { firstName?: string; lastName?: string }) {
   return `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
 }
 
 function safeParseArray<T>(raw: string | null): T[] {
   if (!raw) return [];
+
   try {
     const parsed: unknown = JSON.parse(raw);
     return Array.isArray(parsed) ? (parsed as T[]) : [];
@@ -112,6 +111,7 @@ function getSavedCheckoutInfo(): SavedCheckoutInfo | null {
 
   try {
     const parsed: unknown = JSON.parse(raw);
+
     if (
       parsed &&
       typeof parsed === "object" &&
@@ -120,6 +120,7 @@ function getSavedCheckoutInfo(): SavedCheckoutInfo | null {
       "customerAddress" in parsed
     ) {
       const data = parsed as SavedCheckoutInfo;
+
       return {
         customerName: String(data.customerName || ""),
         customerPhone: String(data.customerPhone || ""),
@@ -178,13 +179,15 @@ function saveAddressToHistory(data: {
     (item) =>
       item.customerName.trim().toLowerCase() === normalizedName.toLowerCase() &&
       normalizePhone(item.customerPhone) === normalizedPhone &&
-      item.customerAddress.trim().toLowerCase() === normalizedAddress.toLowerCase(),
+      item.customerAddress.trim().toLowerCase() ===
+        normalizedAddress.toLowerCase(),
   );
 
   let next = [...current];
 
   if (duplicatedIndex >= 0) {
     const duplicated = next[duplicatedIndex];
+
     next.splice(duplicatedIndex, 1);
     next.unshift({
       ...duplicated,
@@ -255,7 +258,9 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { removePurchasedItems } = useCart();
+
   const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
 
   const items = useMemo<CheckoutCartItem[]>(() => {
     const saved = localStorage.getItem("checkout_items");
@@ -301,7 +306,15 @@ export default function CheckoutPage() {
   );
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [discountAmount, setDiscountAmount] = useState(0);
-  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (token) {
+      void dispatch(getProfile());
+    }
+  }, [dispatch, token]);
 
   useEffect(() => {
     setSavedAddresses(getSavedAddresses());
@@ -310,17 +323,13 @@ export default function CheckoutPage() {
   useEffect(() => {
     const savedInfo = getSavedCheckoutInfo();
 
-    if (savedInfo) {
-      setCustomerName(savedInfo.customerName);
-      setCustomerPhone(savedInfo.customerPhone);
-      setCustomerAddress(savedInfo.customerAddress);
-      setSaveForNextTime(true);
-      return;
-    }
+    setCustomerName(accountName || savedInfo?.customerName || "");
+    setCustomerPhone(accountPhone || savedInfo?.customerPhone || "");
+    setCustomerAddress(accountAddress || savedInfo?.customerAddress || "");
 
-    setCustomerName(accountName);
-    setCustomerPhone(accountPhone);
-    setCustomerAddress(accountAddress);
+    if (savedInfo) {
+      setSaveForNextTime(true);
+    }
   }, [accountName, accountPhone, accountAddress]);
 
   const total = useMemo(() => {
@@ -442,7 +451,11 @@ export default function CheckoutPage() {
 
       setFormErrors(errors);
 
-      if (errors.customerName || errors.customerPhone || errors.customerAddress) {
+      if (
+        errors.customerName ||
+        errors.customerPhone ||
+        errors.customerAddress
+      ) {
         toast.error("Vui lòng kiểm tra lại thông tin nhận hàng");
         return;
       }
@@ -477,13 +490,15 @@ export default function CheckoutPage() {
       }
 
       if (updateAccountInfo) {
-        const [firstName = "", ...rest] = trimmedName.split(" ");
-        const lastName = rest.join(" ").trim();
+        const nameParts = trimmedName.split(" ").filter(Boolean);
+        const lastName =
+          nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+        const firstName = nameParts.length > 0 ? nameParts[0] : "";
 
         await dispatch(
           updateProfile({
             firstName: firstName.trim(),
-            lastName: lastName,
+            lastName: lastName.trim(),
             phone: trimmedPhone,
             address: trimmedAddress,
           }),
@@ -567,7 +582,9 @@ export default function CheckoutPage() {
           setSaveAddressBook={setSaveAddressBook}
           updateAccountInfo={updateAccountInfo}
           setUpdateAccountInfo={setUpdateAccountInfo}
-          hasAccountInfo={Boolean(accountName || accountPhone || accountAddress)}
+          hasAccountInfo={Boolean(
+            accountName || accountPhone || accountAddress,
+          )}
           formErrors={formErrors}
           savedAddresses={savedAddresses}
           selectedSavedAddressId={selectedSavedAddressId}

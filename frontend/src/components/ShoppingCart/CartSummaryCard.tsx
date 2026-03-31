@@ -2,7 +2,6 @@ type Props = {
   selectedItemsCount: number;
   totalQuantitySelected: number;
   totalSelected: number;
-  savedCouponCode: string;
   someChecked: boolean;
   handleCheckout: () => void;
   formatPrice: (value: number) => string;
@@ -12,7 +11,6 @@ export default function CartSummaryCard({
   selectedItemsCount,
   totalQuantitySelected,
   totalSelected,
-  savedCouponCode,
   someChecked,
   handleCheckout,
   formatPrice,
@@ -38,13 +36,6 @@ export default function CartSummaryCard({
           </span>
         </div>
 
-        <div className="mt-2 flex items-center justify-between text-sm">
-          <span className="text-gray-600">Mã giảm giá</span>
-          <span className="font-semibold text-orange-600">
-            {savedCouponCode || "Chưa áp dụng"}
-          </span>
-        </div>
-
         <div className="mt-3 flex items-center justify-between">
           <span className="font-semibold text-gray-700">Tổng thanh toán</span>
           <span className="text-2xl font-extrabold text-orange-600">
@@ -53,8 +44,7 @@ export default function CartSummaryCard({
         </div>
 
         <p className="mt-2 text-xs text-gray-500">
-          Số tiền giảm thực tế sẽ được kiểm tra và áp dụng chính xác ở bước
-          thanh toán.
+          Mã giảm giá sẽ được nhập và kiểm tra chính xác ở bước thanh toán.
         </p>
       </div>
 
