@@ -52,7 +52,10 @@ export default function Header() {
                 </Link>
                 <span>|</span>
                 <button
-                  onClick={() => dispatch(logout())}
+                  onClick={() => {
+                    localStorage.removeItem("checkout_items");
+                    dispatch(logout());
+                  }}
                   className="hover:underline"
                   type="button"
                 >

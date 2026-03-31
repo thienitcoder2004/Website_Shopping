@@ -1,8 +1,8 @@
 const router = require("express").Router();
 const inventoryController = require("../controllers/inventory.controller");
-const { protect, adminOnly } = require("../middlewares/auth.middleware");
+const { protect, checkRole } = require("../middlewares/auth.middleware");
 
-router.use(protect, adminOnly);
+router.use(protect, checkRole(["admin", "staff"]));
 
 router.post("/adjust", inventoryController.adjust);
 router.get("/history", inventoryController.history);

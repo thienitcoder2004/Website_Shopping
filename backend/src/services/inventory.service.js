@@ -3,107 +3,118 @@ const Product = require("../models/Product");
 const InventoryLog = require("../models/InventoryLog");
 
 exports.adjustStock = async ({ productId, type, qty, note }, userId) => {
-    if (!mongoose.Types.ObjectId.isValid(productId))
-        throw new Error("INVALID_PRODUCT_ID");
-    if (!["IN", "OUT", "ADJUST"].includes(type)) throw new Error("INVALID_TYPE");
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
+    throw new Error("INVALID_PRODUCT_ID");
+  }
 
-    const nQty = Number(qty);
-    if (!Number.isFinite(nQty) || nQty <= 0) throw new Error("INVALID_QTY");
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    throw new Error("INVALID_USER_ID");
+  }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+  if (!["IN", "OUT", "ADJUST"].includes(type)) {
+    throw new Error("INVALID_TYPE");
+  }
 
-    try {
-        const product = await Product.findById(productId).session(session);
-        if (!product) throw new Error("PRODUCT_NOT_FOUND");
+  const nQty = Number(qty);
+  if (!Number.isFinite(nQty) || nQty <= 0) {
+    throw new Error("INVALID_QTY");
+  }
 
-        // ✅ kho và web là 2 biến tách riêng
-        const beforeWarehouse = Number(product.warehouseStock || 0);
-        const beforeShop = Number(product.stock || 0);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-        let afterWarehouse = beforeWarehouse;
-        let afterShop = beforeShop;
+  try {
+    const product = await Product.findById(productId).session(session);
+    if (!product) throw new Error("PRODUCT_NOT_FOUND");
 
-        if (type === "IN") {
-            // ✅ nhập kho: tăng warehouseStock
-            afterWarehouse = beforeWarehouse + nQty;
-        }
+    const beforeWarehouse = Number(product.warehouseStock || 0);
+    const beforeShop = Number(product.stock || 0);
 
-        if (type === "OUT") {
-            // ✅ xuất ra web: kho giảm, web tăng
-            if (beforeWarehouse < nQty) throw new Error("WAREHOUSE_NOT_ENOUGH");
-            afterWarehouse = beforeWarehouse - nQty;
-            afterShop = beforeShop + nQty;
-        }
+    let afterWarehouse = beforeWarehouse;
+    let afterShop = beforeShop;
 
-        if (type === "ADJUST") {
-            // ✅ Option A: ADJUST = chỉnh tồn kho (warehouseStock)
-            afterWarehouse = nQty;
-            // afterShop giữ nguyên
-        }
-
-        product.warehouseStock = afterWarehouse;
-        product.stock = afterShop;
-        await product.save({ session });
-
-        await InventoryLog.create(
-            [
-                {
-                    productId,
-                    type,
-                    qty: nQty,
-
-                    beforeWarehouse,
-                    afterWarehouse,
-                    beforeShop,
-                    afterShop,
-
-                    note: note || "",
-                    createdBy: userId,
-                },
-            ],
-            { session },
-        );
-
-        await session.commitTransaction();
-        session.endSession();
-
-        return {
-            productId,
-            beforeWarehouse,
-            afterWarehouse,
-            beforeShop,
-            afterShop,
-        };
-    } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
-        throw err;
+    if (type === "IN") {
+      afterWarehouse = beforeWarehouse + nQty;
     }
+
+    if (type === "OUT") {
+      if (beforeWarehouse < nQty) throw new Error("WAREHOUSE_NOT_ENOUGH");
+      afterWarehouse = beforeWarehouse - nQty;
+      afterShop = beforeShop + nQty;
+    }
+
+    if (type === "ADJUST") {
+      afterWarehouse = nQty;
+    }
+
+    product.warehouseStock = afterWarehouse;
+    product.stock = afterShop;
+    await product.save({ session });
+
+    await InventoryLog.create(
+      [
+        {
+          productId,
+          type,
+          qty: nQty,
+          beforeWarehouse,
+          afterWarehouse,
+          beforeShop,
+          afterShop,
+          note: note || "",
+          createdBy: userId,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      productId,
+      beforeWarehouse,
+      afterWarehouse,
+      beforeShop,
+      afterShop,
+    };
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
 };
 
 exports.history = async ({ productId, page = 1, limit = 20 }) => {
-    const filter = {};
-    if (productId) filter.productId = productId;
+  const filter = {};
 
-    const skip = (Number(page) - 1) * Number(limit);
+  if (productId) {
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      throw new Error("INVALID_PRODUCT_ID");
+    }
+    filter.productId = productId;
+  }
 
-    const [items, total] = await Promise.all([
-        InventoryLog.find(filter)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(Number(limit))
-            .populate("productId", "name sku slug stock warehouseStock")
-            .populate("createdBy", "name email")
-            .lean(),
-        InventoryLog.countDocuments(filter),
-    ]);
+  const currentPage = Number(page) > 0 ? Number(page) : 1;
+  const currentLimit = Number(limit) > 0 ? Number(limit) : 20;
+  const skip = (currentPage - 1) * currentLimit;
 
-    return {
-        items,
-        total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(total / Number(limit)),
-    };
+  const [items, total] = await Promise.all([
+    InventoryLog.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(currentLimit)
+      .populate("productId", "name sku slug stock warehouseStock")
+      .populate("createdBy", "firstName lastName email")
+      .lean(),
+    InventoryLog.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    total,
+    page: currentPage,
+    limit: currentLimit,
+    totalPages: Math.ceil(total / currentLimit) || 1,
+  };
 };

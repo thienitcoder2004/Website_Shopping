@@ -5,7 +5,7 @@ import {
   updateCoupon,
   deleteCoupon,
 } from "../../api/coupon.api";
-import Pagination from "../../components/Pagination";
+import Pagination from "../../components/common/Pagination";
 import axios from "axios";
 
 type CouponType = "percentage" | "fixed";
@@ -15,8 +15,12 @@ type TCoupon = {
   code: string;
   type: CouponType;
   value: number;
-  startDate: string; // ISO string
-  endDate: string; // ISO string
+  minOrderValue?: number;
+  maxDiscount?: number;
+  usageLimit?: number;
+  usedCount?: number;
+  startDate: string;
+  endDate: string;
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -26,8 +30,11 @@ type CouponForm = {
   code: string;
   type: CouponType;
   value: number;
-  startDate: string; // yyyy-mm-dd
-  endDate: string; // yyyy-mm-dd
+  minOrderValue: number;
+  maxDiscount: number;
+  usageLimit: number;
+  startDate: string;
+  endDate: string;
   isActive: boolean;
 };
 
@@ -38,11 +45,16 @@ function getAxiosErrorMessage(err: unknown, fallback: string) {
     const msg = (err.response?.data as { message?: unknown } | undefined)
       ?.message;
     if (typeof msg === "string" && msg.trim()) return msg;
-    if (typeof err.message === "string" && err.message.trim())
+    if (typeof err.message === "string" && err.message.trim()) {
       return err.message;
+    }
   }
   if (err instanceof Error && err.message.trim()) return err.message;
   return fallback;
+}
+
+function formatMoney(value: number) {
+  return value.toLocaleString("vi-VN") + " VNĐ";
 }
 
 export default function CouponsPage() {
@@ -58,6 +70,9 @@ export default function CouponsPage() {
     code: "",
     type: "percentage",
     value: 0,
+    minOrderValue: 0,
+    maxDiscount: 0,
+    usageLimit: 0,
     startDate: "",
     endDate: "",
     isActive: true,
@@ -90,6 +105,9 @@ export default function CouponsPage() {
       code: "",
       type: "percentage",
       value: 0,
+      minOrderValue: 0,
+      maxDiscount: 0,
+      usageLimit: 0,
       startDate: "",
       endDate: "",
       isActive: true,
@@ -103,16 +121,23 @@ export default function CouponsPage() {
       return;
     }
 
+    if (Number(form.value) <= 0) {
+      alert("Giá trị giảm phải lớn hơn 0");
+      return;
+    }
+
     if (new Date(form.startDate) > new Date(form.endDate)) {
       alert("Ngày bắt đầu không được lớn hơn ngày kết thúc");
       return;
     }
 
-    // payload gửi lên BE (giữ đúng kiểu)
     const payload: CouponForm = {
       ...form,
       code: form.code.trim().toUpperCase(),
       value: Number(form.value || 0),
+      minOrderValue: Number(form.minOrderValue || 0),
+      maxDiscount: Number(form.maxDiscount || 0),
+      usageLimit: Number(form.usageLimit || 0),
     };
 
     setLoading(true);
@@ -139,6 +164,9 @@ export default function CouponsPage() {
       code: coupon.code ?? "",
       type: coupon.type ?? "percentage",
       value: coupon.value ?? 0,
+      minOrderValue: coupon.minOrderValue ?? 0,
+      maxDiscount: coupon.maxDiscount ?? 0,
+      usageLimit: coupon.usageLimit ?? 0,
       startDate: coupon.startDate?.slice(0, 10) ?? "",
       endDate: coupon.endDate?.slice(0, 10) ?? "",
       isActive: !!coupon.isActive,
@@ -160,13 +188,17 @@ export default function CouponsPage() {
     }
   };
 
-  /* ================= STATUS ================= */
+  const checkStatus = (coupon: TCoupon) => {
+    const now = new Date();
 
-  const checkStatus = (endDate: string) => {
-    return new Date() > new Date(endDate) ? "Hết hạn" : "Còn hạn";
+    if (!coupon.isActive) return "Tạm ngưng";
+    if (now < new Date(coupon.startDate)) return "Chưa bắt đầu";
+    if (now > new Date(coupon.endDate)) return "Hết hạn";
+    if ((coupon.usageLimit ?? 0) > 0 && (coupon.usedCount ?? 0) >= (coupon.usageLimit ?? 0)) {
+      return "Hết lượt";
+    }
+    return "Đang hoạt động";
   };
-
-  /* ================= SEARCH ================= */
 
   const filteredCoupons = useMemo(() => {
     const key = search.trim().toLowerCase();
@@ -174,12 +206,7 @@ export default function CouponsPage() {
     return coupons.filter((c) => c.code.toLowerCase().includes(key));
   }, [search, coupons]);
 
-  /* ================= PAGINATION ================= */
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredCoupons.length / itemsPerPage),
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredCoupons.length / itemsPerPage));
 
   const currentData = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -187,11 +214,8 @@ export default function CouponsPage() {
     return filteredCoupons.slice(start, end);
   }, [filteredCoupons, currentPage]);
 
-  /* ================= UI ================= */
-
   return (
     <div className="p-10 bg-gray-50 min-h-screen">
-      {/* HEADER */}
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-4xl font-bold text-gray-800">Quản lý Giảm Giá</h1>
@@ -214,9 +238,8 @@ export default function CouponsPage() {
         </div>
       </div>
 
-      {/* FORM CARD */}
       <div className="bg-white rounded-2xl shadow-lg p-8 mb-12">
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-4 gap-6">
           <input
             type="text"
             placeholder="Mã giảm giá"
@@ -240,10 +263,40 @@ export default function CouponsPage() {
 
           <input
             type="number"
-            placeholder="Giá trị"
+            placeholder="Giá trị giảm"
             value={form.value}
             onChange={(e) =>
               setForm((s) => ({ ...s, value: Number(e.target.value) }))
+            }
+            className="input-style"
+          />
+
+          <input
+            type="number"
+            placeholder="Đơn tối thiểu"
+            value={form.minOrderValue}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, minOrderValue: Number(e.target.value) }))
+            }
+            className="input-style"
+          />
+
+          <input
+            type="number"
+            placeholder="Giảm tối đa"
+            value={form.maxDiscount}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, maxDiscount: Number(e.target.value) }))
+            }
+            className="input-style"
+          />
+
+          <input
+            type="number"
+            placeholder="Giới hạn lượt dùng"
+            value={form.usageLimit}
+            onChange={(e) =>
+              setForm((s) => ({ ...s, usageLimit: Number(e.target.value) }))
             }
             className="input-style"
           />
@@ -297,12 +350,9 @@ export default function CouponsPage() {
         </div>
       </div>
 
-      {/* TABLE CARD */}
       <div className="bg-white rounded-2xl shadow-lg p-8">
         {loading ? (
-          <div className="text-center py-16 text-gray-400 text-lg">
-            Đang tải...
-          </div>
+          <div className="text-center py-16 text-gray-400 text-lg">Đang tải...</div>
         ) : currentData.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-lg">
             Không có mã giảm giá nào
@@ -316,6 +366,9 @@ export default function CouponsPage() {
                     <th className="py-4">Code</th>
                     <th>Loại</th>
                     <th>Giá trị</th>
+                    <th>Đơn tối thiểu</th>
+                    <th>Giảm tối đa</th>
+                    <th>Lượt dùng</th>
                     <th>Bắt đầu</th>
                     <th>Kết thúc</th>
                     <th>Trạng thái</th>
@@ -324,52 +377,66 @@ export default function CouponsPage() {
                 </thead>
 
                 <tbody>
-                  {currentData.map((c) => (
-                    <tr
-                      key={c._id}
-                      className="border-b hover:bg-gray-50 transition"
-                    >
-                      <td className="py-4 font-semibold text-gray-800">
-                        {c.code}
-                      </td>
-                      <td>
-                        {c.type === "percentage" ? "Phần trăm" : "Số tiền"}
-                      </td>
-                      <td className="font-medium">
-                        {c.value.toLocaleString("vi-VN")}{" "}
-                        {c.type === "percentage" ? "%" : "VNĐ"}
-                      </td>
-                      <td>
-                        {new Date(c.startDate).toLocaleDateString("vi-VN")}
-                      </td>
-                      <td>{new Date(c.endDate).toLocaleDateString("vi-VN")}</td>
-                      <td>
-                        <span
-                          className={`px-4 py-1 rounded-full text-sm font-semibold ${
-                            checkStatus(c.endDate) === "Hết hạn"
-                              ? "bg-red-100 text-red-600"
-                              : "bg-green-100 text-green-600"
-                          }`}
-                        >
-                          {checkStatus(c.endDate)}
-                        </span>
-                      </td>
-                      <td className="space-x-4">
-                        <button
-                          onClick={() => handleEdit(c)}
-                          className="text-blue-600 hover:text-blue-800 font-medium"
-                        >
-                          Sửa
-                        </button>
-                        <button
-                          onClick={() => handleDelete(c._id)}
-                          className="text-red-600 hover:text-red-800 font-medium"
-                        >
-                          Xóa
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentData.map((c) => {
+                    const status = checkStatus(c);
+
+                    return (
+                      <tr
+                        key={c._id}
+                        className="border-b hover:bg-gray-50 transition"
+                      >
+                        <td className="py-4 font-semibold text-gray-800">{c.code}</td>
+                        <td>{c.type === "percentage" ? "Phần trăm" : "Số tiền"}</td>
+                        <td className="font-medium">
+                          {c.type === "percentage"
+                            ? `${c.value}%`
+                            : formatMoney(c.value)}
+                        </td>
+                        <td>{formatMoney(c.minOrderValue ?? 0)}</td>
+                        <td>
+                          {(c.maxDiscount ?? 0) > 0
+                            ? formatMoney(c.maxDiscount ?? 0)
+                            : "Không giới hạn"}
+                        </td>
+                        <td>
+                          {c.usedCount ?? 0}/{c.usageLimit ?? 0}
+                        </td>
+                        <td>{new Date(c.startDate).toLocaleDateString("vi-VN")}</td>
+                        <td>{new Date(c.endDate).toLocaleDateString("vi-VN")}</td>
+                        <td>
+                          <span
+                            className={`px-4 py-1 rounded-full text-sm font-semibold ${
+                              status === "Đang hoạt động"
+                                ? "bg-green-100 text-green-600"
+                                : status === "Hết hạn"
+                                  ? "bg-red-100 text-red-600"
+                                  : status === "Tạm ngưng"
+                                    ? "bg-gray-200 text-gray-700"
+                                    : status === "Chưa bắt đầu"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-orange-100 text-orange-700"
+                            }`}
+                          >
+                            {status}
+                          </span>
+                        </td>
+                        <td className="space-x-4">
+                          <button
+                            onClick={() => handleEdit(c)}
+                            className="text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            onClick={() => handleDelete(c._id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
+                          >
+                            Xóa
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

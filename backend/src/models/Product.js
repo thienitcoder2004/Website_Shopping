@@ -19,21 +19,27 @@ const ProductSchema = new mongoose.Schema(
             ref: "Category",
             required: true,
         },
-        brandId: { type: mongoose.Schema.Types.ObjectId, ref: "Brand" },
+        brandId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Brand",
+        },
 
         stock: { type: Number, default: 0, min: 0 },
-
         warehouseStock: { type: Number, default: 0, min: 0 },
 
         colors: { type: [String], default: [] },
         sizes: { type: [String], default: [] },
+
+        ratingAverage: { type: Number, default: 0, min: 0, max: 5 },
+        ratingCount: { type: Number, default: 0, min: 0 },
+        reviewCount: { type: Number, default: 0, min: 0 },
 
         isActive: { type: Boolean, default: true },
 
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },
-    { timestamps: true },
+    { timestamps: true }
 );
 
 module.exports = mongoose.model("Product", ProductSchema);

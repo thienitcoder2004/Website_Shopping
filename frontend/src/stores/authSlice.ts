@@ -1,13 +1,23 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createSlice,
+  createAsyncThunk,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import axios from "axios";
 
 interface User {
-  id: string;
+  id?: string;
+  _id?: string;
   email: string;
   role: string;
   firstName: string;
   lastName: string;
+  phone?: string;
   address?: string;
+  avatar?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference?: "male" | "female" | "both";
 }
 
 interface AuthState {
@@ -22,7 +32,10 @@ type AuthResponse = {
   token: string;
 };
 
-type LoginPayload = { email: string; password: string };
+type LoginPayload = {
+  email: string;
+  password: string;
+};
 
 type RegisterPayload = {
   firstName: string;
@@ -30,6 +43,26 @@ type RegisterPayload = {
   email: string;
   phone: string;
   password: string;
+  dateOfBirth: string;
+  gender: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference: "male" | "female" | "both";
+};
+
+type UpdateProfilePayload = {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  address?: string;
+  avatar?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say";
+  shoppingPreference?: "male" | "female" | "both";
+};
+
+type UpdateProfileResponse = {
+  ok?: boolean;
+  message: string;
+  user: User;
 };
 
 function safeParseJSON<T>(raw: string | null): T | null {
@@ -41,32 +74,51 @@ function safeParseJSON<T>(raw: string | null): T | null {
   }
 }
 
+function normalizeUser(user: User | null): User | null {
+  if (!user) return null;
+
+  return {
+    ...user,
+    role: String(user.role || "user").toLowerCase(),
+  };
+}
+
 function getAxiosErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const msg = err.response?.data?.message;
     if (typeof msg === "string" && msg.trim()) return msg;
-    if (typeof err.message === "string" && err.message.trim()) return err.message;
+    if (typeof err.message === "string" && err.message.trim()) {
+      return err.message;
+    }
   }
+
   if (err instanceof Error && err.message.trim()) return err.message;
   return fallback;
 }
 
+function getProfileEndpointByRole(role?: string) {
+  const normalizedRole = String(role || "").toLowerCase();
+  return normalizedRole === "staff" || normalizedRole === "admin"
+    ? "http://localhost:5000/api/staff/me"
+    : "http://localhost:5000/api/users/me";
+}
+
 const initialState: AuthState = {
-  user: safeParseJSON<User>(localStorage.getItem("user")),
+  user: normalizeUser(safeParseJSON<User>(localStorage.getItem("user"))),
   token: localStorage.getItem("token"),
   loading: false,
   error: null,
 };
 
 export const login = createAsyncThunk<
-  AuthResponse, 
-  LoginPayload, 
+  AuthResponse,
+  LoginPayload,
   { rejectValue: string }
 >("auth/login", async (data, { rejectWithValue }) => {
   try {
     const res = await axios.post<AuthResponse>(
       "http://localhost:5000/api/auth/login",
-      data
+      data,
     );
     return res.data;
   } catch (err: unknown) {
@@ -82,11 +134,69 @@ export const register = createAsyncThunk<
   try {
     const res = await axios.post<AuthResponse>(
       "http://localhost:5000/api/auth/register",
-      data
+      data,
     );
     return res.data;
   } catch (err: unknown) {
     return rejectWithValue(getAxiosErrorMessage(err, "Đăng ký thất bại"));
+  }
+});
+
+export const updateProfile = createAsyncThunk<
+  UpdateProfileResponse,
+  UpdateProfilePayload,
+  { state: { auth: AuthState }; rejectValue: string }
+>("auth/updateProfile", async (data, { getState, rejectWithValue }) => {
+  try {
+    const state = getState().auth;
+    const token = state.token;
+
+    if (!token) {
+      return rejectWithValue("Bạn chưa đăng nhập");
+    }
+
+    const endpoint = getProfileEndpointByRole(state.user?.role);
+
+    const res = await axios.put<UpdateProfileResponse>(endpoint, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return res.data;
+  } catch (err: unknown) {
+    return rejectWithValue(
+      getAxiosErrorMessage(err, "Cập nhật thông tin thất bại"),
+    );
+  }
+});
+
+export const getProfile = createAsyncThunk<
+  { user: User },
+  void,
+  { state: { auth: AuthState }; rejectValue: string }
+>("auth/getProfile", async (_, { getState, rejectWithValue }) => {
+  try {
+    const state = getState().auth;
+    const token = state.token;
+
+    if (!token) {
+      return rejectWithValue("Bạn chưa đăng nhập");
+    }
+
+    const endpoint = getProfileEndpointByRole(state.user?.role);
+
+    const res = await axios.get<{ ok?: boolean; user: User }>(endpoint, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return { user: res.data.user };
+  } catch (err: unknown) {
+    return rejectWithValue(
+      getAxiosErrorMessage(err, "Lấy thông tin tài khoản thất bại"),
+    );
   }
 });
 
@@ -97,60 +207,107 @@ const authSlice = createSlice({
     logout(state) {
       state.user = null;
       state.token = null;
+      state.loading = false;
       state.error = null;
 
       localStorage.removeItem("token");
       localStorage.removeItem("user");
     },
+    clearAuthError(state) {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
-    /* LOGIN */
-    builder.addCase(login.pending, (state) => {
-      state.loading = true;
-      state.error = null;
-    });
+    builder
+      .addCase(login.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        login.fulfilled,
+        (state, action: PayloadAction<AuthResponse>) => {
+          state.loading = false;
+          state.user = normalizeUser(action.payload.user);
+          state.token = action.payload.token;
+          state.error = null;
 
-    builder.addCase(login.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
-      state.loading = false;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-
-      localStorage.setItem("token", action.payload.token);
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
-    });
-
-    builder.addCase(
-      login.rejected,
-      (state, action: PayloadAction<string | undefined> & { error: { message?: string } }) => {
+          localStorage.setItem("token", action.payload.token);
+          localStorage.setItem("user", JSON.stringify(state.user));
+        },
+      )
+      .addCase(login.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? action.error.message ?? "Đăng nhập thất bại";
-      }
-    );
+        state.error =
+          action.payload ?? action.error.message ?? "Đăng nhập thất bại";
+      })
 
-    /* REGISTER */
-    builder.addCase(register.pending, (state) => {
-      state.loading = true;
-      state.error = null;
-    });
+      .addCase(register.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        register.fulfilled,
+        (state, action: PayloadAction<AuthResponse>) => {
+          state.loading = false;
+          state.user = normalizeUser(action.payload.user);
+          state.token = action.payload.token;
+          state.error = null;
 
-    builder.addCase(register.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
-      state.loading = false;
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-
-      localStorage.setItem("token", action.payload.token);
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
-    });
-
-    builder.addCase(
-      register.rejected,
-      (state, action: PayloadAction<string | undefined> & { error: { message?: string } }) => {
+          localStorage.setItem("token", action.payload.token);
+          localStorage.setItem("user", JSON.stringify(state.user));
+        },
+      )
+      .addCase(register.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload ?? action.error.message ?? "Đăng ký thất bại";
-      }
-    );
+        state.error =
+          action.payload ?? action.error.message ?? "Đăng ký thất bại";
+      })
+
+      .addCase(getProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        getProfile.fulfilled,
+        (state, action: PayloadAction<{ user: User }>) => {
+          state.loading = false;
+          state.user = normalizeUser(action.payload.user);
+          state.error = null;
+
+          localStorage.setItem("user", JSON.stringify(state.user));
+        },
+      )
+      .addCase(getProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error =
+          action.payload ??
+          action.error.message ??
+          "Lấy thông tin tài khoản thất bại";
+      })
+
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(
+        updateProfile.fulfilled,
+        (state, action: PayloadAction<UpdateProfileResponse>) => {
+          state.loading = false;
+          state.user = normalizeUser(action.payload.user);
+          state.error = null;
+
+          localStorage.setItem("user", JSON.stringify(state.user));
+        },
+      )
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error =
+          action.payload ??
+          action.error.message ??
+          "Cập nhật thông tin thất bại";
+      });
   },
 });
 
-export const { logout } = authSlice.actions;
+export const { logout, clearAuthError } = authSlice.actions;
 export default authSlice.reducer;
