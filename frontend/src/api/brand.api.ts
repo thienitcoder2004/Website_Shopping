@@ -21,21 +21,24 @@ export type BrandCreatePayload = {
 
 export type BrandUpdatePayload = Partial<BrandCreatePayload>;
 
-export type ApiListResponse<T> =
-  | { data: T }
-  | { data: { items: T } }
-  | T;
+export type BrandsResponse = {
+  ok?: boolean;
+  brands: Brand[];
+};
 
-  export const getBrands = () =>
-  axiosInstance.get<ApiListResponse<Brand[]>>("/brands");
+export type BrandDetailResponse = {
+  ok?: boolean;
+  message?: string;
+  brand: Brand;
+};
+
+export const getBrands = () => axiosInstance.get<BrandsResponse>("/brands");
 
 export const createBrand = (data: BrandCreatePayload) =>
-  axiosInstance.post<{ data: Brand } | Brand>("/brands", data);
+  axiosInstance.post<BrandDetailResponse>("/brands", data);
 
 export const updateBrand = (id: string, data: BrandUpdatePayload) =>
-  axiosInstance.put<{ data: Brand } | Brand>(`/brands/${id}`, data);
+  axiosInstance.put<BrandDetailResponse>(`/brands/${id}`, data);
 
 export const deleteBrand = (id: string) =>
-  axiosInstance.delete<{ success: boolean; message?: string } | void>(
-    `/brands/${id}`,
-  );
+  axiosInstance.delete<{ ok?: boolean; message?: string }>(`/brands/${id}`);

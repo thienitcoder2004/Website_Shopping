@@ -2,14 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { productApi } from "../../api/product.api";
-import { getCategories } from "../../api/category.api";
-import { getBrands } from "../../api/brand.api";
+import { getCategories, type CategoryItem } from "../../api/category.api";
+import { getBrands, type Brand } from "../../api/brand.api";
 import type { TProduct } from "../../types/product.type";
 import { uploadFiles } from "../../api/upload.api";
 import { apiFile } from "../../utils/apiFile";
-
-type TCategory = { _id: string; name: string; slug?: string };
-type TBrand = { _id: string; name: string; slug?: string };
 
 type FormState = {
   name: string;
@@ -31,8 +28,6 @@ type FormState = {
   primaryImage: string;
   images: string[];
 };
-
-type IdLike = string | { _id: string };
 
 type ProductUpsertPayload = {
   name: string;
@@ -86,10 +81,12 @@ function parseCSV(text: string) {
 
 function pickId(v: unknown): string {
   if (typeof v === "string") return v;
+
   if (v && typeof v === "object" && "_id" in v) {
     const id = (v as { _id?: unknown })._id;
     if (typeof id === "string") return id;
   }
+
   return "";
 }
 
@@ -97,6 +94,7 @@ function getAxiosErrorMessage(err: unknown, fallback: string) {
   if (axios.isAxiosError(err)) {
     const msg = (err.response?.data as { message?: unknown } | undefined)
       ?.message;
+
     if (typeof msg === "string" && msg.trim()) return msg;
     if (typeof err.message === "string" && err.message.trim()) {
       return err.message;
@@ -105,32 +103,6 @@ function getAxiosErrorMessage(err: unknown, fallback: string) {
 
   if (err instanceof Error && err.message.trim()) return err.message;
   return fallback;
-}
-
-function extractList<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-
-  if (payload && typeof payload === "object") {
-    const obj = payload as {
-      data?: unknown;
-      items?: unknown;
-    };
-
-    if (Array.isArray(obj.data)) return obj.data as T[];
-    if (Array.isArray(obj.items)) return obj.items as T[];
-
-    if (obj.data && typeof obj.data === "object") {
-      const nested = obj.data as {
-        data?: unknown;
-        items?: unknown;
-      };
-
-      if (Array.isArray(nested.data)) return nested.data as T[];
-      if (Array.isArray(nested.items)) return nested.items as T[];
-    }
-  }
-
-  return [];
 }
 
 export default function ProductForm() {
@@ -142,20 +114,24 @@ export default function ProductForm() {
   const [loading, setLoading] = useState(false);
   const [state, setState] = useState<FormState>(emptyState);
 
-  const [categories, setCategories] = useState<TCategory[]>([]);
-  const [brands, setBrands] = useState<TBrand[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
 
   const setField = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setState((s) => ({ ...s, [k]: v }));
   };
 
+  // Load categories + brands
   useEffect(() => {
     const run = async () => {
       try {
         const [cRes, bRes] = await Promise.all([getCategories(), getBrands()]);
 
-        const cData = extractList<TCategory>(cRes.data);
-        const bData = extractList<TBrand>(bRes.data);
+        const cData = Array.isArray(cRes.data.categories)
+          ? cRes.data.categories
+          : [];
+
+        const bData = Array.isArray(bRes.data.brands) ? bRes.data.brands : [];
 
         setCategories(cData);
         setBrands(bData);
@@ -165,7 +141,7 @@ export default function ProductForm() {
           categoryId: s.categoryId || cData?.[0]?._id || "",
         }));
       } catch (err: unknown) {
-        console.error(err);
+        console.error("Load categories/brands error:", err);
         alert(getAxiosErrorMessage(err, "Không load được categories/brands"));
       }
     };
@@ -173,6 +149,7 @@ export default function ProductForm() {
     void run();
   }, []);
 
+  // Load product detail if edit
   useEffect(() => {
     const run = async () => {
       if (isNew) return;
@@ -195,8 +172,8 @@ export default function ProductForm() {
           price: p.price || 0,
           salePrice: p.salePrice || 0,
 
-          categoryId: pickId(p.categoryId as unknown as IdLike),
-          brandId: pickId(p.brandId as unknown as IdLike),
+          categoryId: pickId(p.categoryId),
+          brandId: pickId(p.brandId),
 
           isActive: Boolean(p.isActive),
           stock: p.stock || 0,
@@ -207,6 +184,9 @@ export default function ProductForm() {
           primaryImage: primary,
           images: gallery,
         });
+      } catch (err: unknown) {
+        console.error("Load product detail error:", err);
+        alert(getAxiosErrorMessage(err, "Không load được chi tiết sản phẩm"));
       } finally {
         setLoading(false);
       }
@@ -224,20 +204,31 @@ export default function ProductForm() {
   const setPrimary = (url: string) => {
     setState((s) => {
       const nextGallery = [...s.images];
+
       if (s.primaryImage && s.primaryImage !== url) {
         nextGallery.unshift(s.primaryImage);
       }
+
       const cleaned = nextGallery.filter((x) => x && x !== url);
-      return { ...s, primaryImage: url, images: Array.from(new Set(cleaned)) };
+
+      return {
+        ...s,
+        primaryImage: url,
+        images: Array.from(new Set(cleaned)),
+      };
     });
   };
 
   const removeGallery = (url: string) => {
-    setState((s) => ({ ...s, images: s.images.filter((x) => x !== url) }));
+    setState((s) => ({
+      ...s,
+      images: s.images.filter((x) => x !== url),
+    }));
   };
 
   const onPickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+
     const arr = Array.from(files);
 
     setLoading(true);
@@ -257,7 +248,12 @@ export default function ProductForm() {
         const dedup = Array.from(
           new Set(gallery.filter((x) => x && x !== primary)),
         );
-        return { ...s, primaryImage: primary, images: dedup };
+
+        return {
+          ...s,
+          primaryImage: primary,
+          images: dedup,
+        };
       });
     } catch (err: unknown) {
       alert(getAxiosErrorMessage(err, "Upload lỗi"));
@@ -299,8 +295,11 @@ export default function ProductForm() {
 
     setLoading(true);
     try {
-      if (isNew) await productApi.create(payload);
-      else if (id) await productApi.update(id, payload);
+      if (isNew) {
+        await productApi.create(payload);
+      } else if (id) {
+        await productApi.update(id, payload);
+      }
 
       nav("/admin/products");
     } catch (err: unknown) {
@@ -457,6 +456,7 @@ export default function ProductForm() {
         <div className="md:col-span-2">
           <div className="flex items-center gap-3">
             <div className="text-sm font-semibold">Ảnh sản phẩm</div>
+
             <label className="ml-auto">
               <input
                 id="product-files"
@@ -475,6 +475,7 @@ export default function ProductForm() {
           <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div className="rounded-xl border p-2">
               <div className="mb-2 text-xs font-bold">PRIMARY</div>
+
               {state.primaryImage ? (
                 <img
                   src={apiFile(state.primaryImage)}
@@ -486,6 +487,7 @@ export default function ProductForm() {
                   Chưa chọn ảnh chính
                 </div>
               )}
+
               <div className="mt-2 text-xs text-gray-600">
                 Click ảnh ở Gallery để đặt làm Primary
               </div>
@@ -493,6 +495,7 @@ export default function ProductForm() {
 
             <div className="rounded-xl border p-2">
               <div className="mb-2 text-xs font-bold">GALLERY</div>
+
               {!state.images.length ? (
                 <div className="text-sm text-gray-400">Chưa có ảnh phụ</div>
               ) : (
@@ -510,6 +513,7 @@ export default function ProductForm() {
                           className="h-24 w-full rounded-md border object-cover group-hover:border-black"
                         />
                       </button>
+
                       <button
                         type="button"
                         onClick={() => removeGallery(u)}

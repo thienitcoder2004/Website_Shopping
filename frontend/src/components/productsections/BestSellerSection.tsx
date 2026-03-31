@@ -41,7 +41,9 @@ function getDiscountPercent(product: TProduct) {
     return null;
   }
 
-  return Math.round(((product.price - product.salePrice) / product.price) * 100);
+  return Math.round(
+    ((product.price - product.salePrice) / product.price) * 100,
+  );
 }
 
 export default function BestSellerSection() {
@@ -141,7 +143,7 @@ export default function BestSellerSection() {
 
               return (
                 <Link
-                  to={`/product/${item.slug || item._id}`}
+                  to={`/products/${item.slug || item._id}`}
                   key={item._id}
                   className="block bg-white p-4 transition duration-300 hover:shadow-lg group"
                 >
