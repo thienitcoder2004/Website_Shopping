@@ -8,6 +8,7 @@ const Promotion = require("../../models/sales/Promotion");
 function buildOrderCode() {
   return `DH${Date.now()}`;
 }
+
 function calculateAge(dateOfBirth) {
   if (!dateOfBirth) return 0;
 
@@ -56,11 +57,41 @@ function signMomo(rawSignature) {
     .digest("hex");
 }
 
-function getPaymentText(paymentMethod, paymentStatus) {
-  if (paymentMethod === "MOMO" && paymentStatus === "PAID") {
-    return "Đã thanh toán";
+function getPaymentText(paymentMethod, paymentStatus, orderStatus = "PENDING") {
+  if (paymentStatus === "PAID") {
+    if (paymentMethod === "MOMO") {
+      return "Đã thanh toán qua MoMo";
+    }
+
+    return "Đã thanh toán khi nhận hàng";
   }
-  return "Chưa thanh toán";
+
+  if (paymentMethod === "MOMO") {
+    if (orderStatus === "CANCELLED") {
+      return "Thanh toán MoMo chưa hoàn tất";
+    }
+
+    return "Chờ MoMo xác nhận thanh toán";
+  }
+
+  if (orderStatus === "SUCCESS") {
+    return "Đã thanh toán khi nhận hàng";
+  }
+
+  return "Thanh toán khi nhận hàng";
+}
+
+function mapOrderResponse(order) {
+  const json = order?.toObject ? order.toObject() : order;
+
+  return {
+    ...json,
+    paymentNote: getPaymentText(
+      json.paymentMethod,
+      json.paymentStatus,
+      json.orderStatus
+    ),
+  };
 }
 
 function calculateCouponDiscount(coupon, subtotal) {
@@ -122,11 +153,14 @@ async function getBestPromotionForProduct(productId, quantity = 1) {
 
   for (const promotion of promotions) {
     if (Number(promotion.saleStock || 0) > 0) {
-      const remain = Number(promotion.saleStock || 0) - Number(promotion.soldCount || 0);
+      const remain =
+        Number(promotion.saleStock || 0) - Number(promotion.soldCount || 0);
+
       if (remain < Number(quantity || 1)) {
         continue;
       }
     }
+
     return promotion;
   }
 
@@ -173,7 +207,9 @@ async function validateAndBuildCoupon(couponCode, subtotal) {
 
   if (subtotal < Number(coupon.minOrderValue || 0)) {
     throw new Error(
-      `Đơn hàng tối thiểu ${Number(coupon.minOrderValue || 0).toLocaleString("vi-VN")} VNĐ`
+      `Đơn hàng tối thiểu ${Number(coupon.minOrderValue || 0).toLocaleString(
+        "vi-VN"
+      )} VNĐ`
     );
   }
 
@@ -231,7 +267,9 @@ async function markPromotionsSoldIfNeeded(order) {
     if (!promotion) continue;
 
     if (Number(promotion.saleStock || 0) > 0) {
-      const remain = Number(promotion.saleStock || 0) - Number(promotion.soldCount || 0);
+      const remain =
+        Number(promotion.saleStock || 0) - Number(promotion.soldCount || 0);
+
       if (remain <= 0) continue;
 
       const increase = Math.min(remain, quantity);
@@ -266,6 +304,7 @@ async function buildOrderItems(items = []) {
     }
 
     const quantity = Number(item.quantity || 0);
+
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new Error("Số lượng sản phẩm không hợp lệ");
     }
@@ -276,6 +315,7 @@ async function buildOrderItems(items = []) {
         : Number(product.price);
 
     const promotion = await getBestPromotionForProduct(product._id, quantity);
+
     const finalPrice = promotion
       ? calculatePromotionPrice(basePrice, promotion)
       : basePrice;
@@ -297,12 +337,12 @@ async function buildOrderItems(items = []) {
       lineTotal: finalPrice * quantity,
       promotion: promotion
         ? {
-            _id: promotion._id,
-            name: promotion.name,
-            type: promotion.type,
-            value: Number(promotion.value || 0),
-            maxDiscount: Number(promotion.maxDiscount || 0),
-          }
+          _id: promotion._id,
+          name: promotion.name,
+          type: promotion.type,
+          value: Number(promotion.value || 0),
+          maxDiscount: Number(promotion.maxDiscount || 0),
+        }
         : null,
     });
   }
@@ -332,7 +372,10 @@ exports.createCashOrder = async (req, res) => {
     }
 
     const orderItems = await buildOrderItems(items);
-    const subtotalAmount = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+    const subtotalAmount = orderItems.reduce(
+      (sum, item) => sum + item.lineTotal,
+      0
+    );
 
     const { couponData, discountAmount, finalTotal } =
       await validateAndBuildCoupon(couponCode, subtotalAmount);
@@ -354,7 +397,7 @@ exports.createCashOrder = async (req, res) => {
       promotionUsed: false,
       paymentMethod: "COD",
       paymentStatus: "UNPAID",
-      paymentNote: getPaymentText("COD", "UNPAID"),
+      paymentNote: getPaymentText("COD", "UNPAID", "PENDING"),
       orderStatus: "PENDING",
       customerName,
       customerPhone,
@@ -368,7 +411,7 @@ exports.createCashOrder = async (req, res) => {
     return res.status(201).json({
       ok: true,
       message: "Đặt hàng tiền mặt thành công",
-      order,
+      order: mapOrderResponse(order),
     });
   } catch (error) {
     return res.status(400).json({
@@ -399,7 +442,10 @@ exports.createMomoPayment = async (req, res) => {
 
     const user = await ensureUserCanPlaceOrder(userId);
     const orderItems = await buildOrderItems(items);
-    const subtotalAmount = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+    const subtotalAmount = orderItems.reduce(
+      (sum, item) => sum + item.lineTotal,
+      0
+    );
 
     const { couponData, discountAmount, finalTotal } =
       await validateAndBuildCoupon(couponCode, subtotalAmount);
@@ -471,22 +517,6 @@ exports.createMomoPayment = async (req, res) => {
       },
     };
 
-    console.log("=== MOMO CONFIG ===");
-    console.log("partnerCode =", JSON.stringify(partnerCode));
-    console.log("accessKey =", JSON.stringify(accessKey));
-    console.log("secretKey length =", secretKey.length);
-    console.log("redirectUrl =", JSON.stringify(redirectUrl));
-    console.log("ipnUrl =", JSON.stringify(ipnUrl));
-
-    console.log("=== MOMO RAW SIGNATURE ===");
-    console.log(rawSignature);
-
-    console.log("=== MOMO SIGNATURE ===");
-    console.log(signature);
-
-    console.log("=== MOMO PAYLOAD ===");
-    console.log(payload);
-
     const momoResponse = await fetch(process.env.MOMO_ENDPOINT, {
       method: "POST",
       headers: {
@@ -496,9 +526,6 @@ exports.createMomoPayment = async (req, res) => {
     });
 
     const momoData = await momoResponse.json();
-
-    console.log("=== MOMO RESPONSE ===");
-    console.log(momoData);
 
     if (Number(momoData.resultCode) !== 0 || !momoData.payUrl) {
       return res.status(400).json({
@@ -525,7 +552,7 @@ exports.createMomoPayment = async (req, res) => {
       promotionUsed: false,
       paymentMethod: "MOMO",
       paymentStatus: "UNPAID",
-      paymentNote: getPaymentText("MOMO", "UNPAID"),
+      paymentNote: getPaymentText("MOMO", "UNPAID", "PENDING"),
       orderStatus: "PENDING",
       customerName,
       customerPhone,
@@ -566,7 +593,7 @@ exports.momoIpn = async (req, res) => {
     const data = req.body || {};
 
     const rawSignature =
-      `accessKey=${process.env.MOMO_ACCESS_KEY}` +
+      `accessKey=${String(process.env.MOMO_ACCESS_KEY || "").trim()}` +
       `&amount=${data.amount}` +
       `&extraData=${data.extraData || ""}` +
       `&message=${data.message}` +
@@ -583,49 +610,67 @@ exports.momoIpn = async (req, res) => {
     const expectedSignature = signMomo(rawSignature);
 
     if (expectedSignature !== data.signature) {
-      return res.status(204).send();
+      return res.status(400).json({
+        ok: false,
+        message: "Sai chữ ký IPN MoMo",
+      });
     }
 
-    const order = await Order.findOne({ orderCode: data.orderId });
+    const order = await Order.findOne({
+      orderCode: data.orderId,
+      paymentMethod: "MOMO",
+    });
+
     if (!order) {
-      return res.status(204).send();
+      return res.status(404).json({
+        ok: false,
+        message: "Không tìm thấy đơn hàng MoMo",
+      });
     }
 
     order.momo = {
       ...order.momo,
+      requestId: data.requestId || order.momo?.requestId || "",
+      orderId: data.orderId || order.momo?.orderId || order.orderCode,
       transId: String(data.transId || ""),
       resultCode: Number(data.resultCode),
       message: data.message || "",
+      payType: data.payType || "",
       responseTime: data.responseTime || null,
       rawCallback: data,
     };
 
     if (Number(data.resultCode) === 0) {
       order.paymentStatus = "PAID";
-    } else {
-      order.paymentStatus = "UNPAID";
-    }
+      order.paymentNote = getPaymentText("MOMO", "PAID", order.orderStatus);
+      await order.save();
 
-    order.paymentNote = getPaymentText(order.paymentMethod, order.paymentStatus);
-
-    await order.save();
-
-    if (Number(data.resultCode) === 0) {
       await markCouponUsedIfNeeded(order);
       await markPromotionsSoldIfNeeded(order);
+    } else {
+      order.paymentStatus = "UNPAID";
+      order.paymentNote = getPaymentText("MOMO", "UNPAID", order.orderStatus);
+      await order.save();
     }
 
-    return res.status(204).send();
+    return res.status(200).json({
+      ok: true,
+      message: "Đã nhận IPN MoMo",
+    });
   } catch (error) {
-    return res.status(204).send();
+    return res.status(500).json({
+      ok: false,
+      message: "Lỗi xử lý IPN MoMo",
+    });
   }
 };
 
 exports.momoReturn = async (req, res) => {
   try {
     const data = req.body || {};
-
+    const userId = req.user.id || req.user._id;
     const orderCode = data.orderId || data.orderCode;
+
     if (!orderCode) {
       return res.status(400).json({
         ok: false,
@@ -633,7 +678,12 @@ exports.momoReturn = async (req, res) => {
       });
     }
 
-    const order = await Order.findOne({ orderCode });
+    const order = await Order.findOne({
+      orderCode,
+      userId,
+      paymentMethod: "MOMO",
+    });
+
     if (!order) {
       return res.status(404).json({
         ok: false,
@@ -646,37 +696,36 @@ exports.momoReturn = async (req, res) => {
       requestId: data.requestId || order.momo?.requestId || "",
       orderId: data.orderId || order.momo?.orderId || order.orderCode,
       transId: String(data.transId || order.momo?.transId || ""),
-      resultCode: Number(
-        data.resultCode !== undefined ? data.resultCode : order.momo?.resultCode ?? -1
-      ),
+      resultCode:
+        data.resultCode !== undefined
+          ? Number(data.resultCode)
+          : order.momo?.resultCode ?? null,
       message: data.message || order.momo?.message || "",
       payType: data.payType || order.momo?.payType || "",
       responseTime: data.responseTime || order.momo?.responseTime || null,
       rawReturn: data,
     };
 
-    if (Number(data.resultCode) === 0) {
-      order.paymentStatus = "PAID";
-    } else {
-      order.paymentStatus = "UNPAID";
-    }
-
-    order.paymentNote = getPaymentText(order.paymentMethod, order.paymentStatus);
+    order.paymentNote = getPaymentText(
+      order.paymentMethod,
+      order.paymentStatus,
+      order.orderStatus
+    );
 
     await order.save();
 
-    if (Number(data.resultCode) === 0) {
-      await markCouponUsedIfNeeded(order);
-      await markPromotionsSoldIfNeeded(order);
-    }
+    const mappedOrder = mapOrderResponse(order);
+    const verifiedPaid = mappedOrder.paymentStatus === "PAID";
 
     return res.json({
       ok: true,
-      message:
-        Number(data.resultCode) === 0
-          ? "Thanh toán MoMo thành công"
+      verifiedPaid,
+      message: verifiedPaid
+        ? "Thanh toán MoMo đã được xác nhận"
+        : Number(data.resultCode) === 0
+          ? "MoMo đã trả kết quả thành công, hệ thống đang chờ xác nhận thanh toán"
           : "Thanh toán MoMo chưa thành công",
-      order,
+      order: mappedOrder,
     });
   } catch (error) {
     return res.status(400).json({
@@ -691,15 +740,9 @@ exports.getMyOrders = async (req, res) => {
     const userId = req.user.id || req.user._id;
     const orders = await Order.find({ userId }).sort({ createdAt: -1 });
 
-    const mappedOrders = orders.map((order) => {
-      const json = order.toObject();
-      json.paymentNote = getPaymentText(json.paymentMethod, json.paymentStatus);
-      return json;
-    });
-
     return res.json({
       ok: true,
-      orders: mappedOrders,
+      orders: orders.map(mapOrderResponse),
     });
   } catch (error) {
     return res.status(500).json({
@@ -725,12 +768,9 @@ exports.getMyOrderDetail = async (req, res) => {
       });
     }
 
-    const json = order.toObject();
-    json.paymentNote = getPaymentText(json.paymentMethod, json.paymentStatus);
-
     return res.json({
       ok: true,
-      order: json,
+      order: mapOrderResponse(order),
     });
   } catch (error) {
     return res.status(500).json({
@@ -742,14 +782,30 @@ exports.getMyOrderDetail = async (req, res) => {
 
 exports.getAdminOrders = async (req, res) => {
   try {
-    const orders = await Order.find()
-      .populate("user", "firstName lastName email phone")
-      .populate("items.product", "name slug images price salePrice")
+    const { status, q } = req.query;
+
+    const filter = {};
+
+    if (status && status !== "ALL") {
+      filter.orderStatus = status;
+    }
+
+    if (q && String(q).trim()) {
+      const keyword = String(q).trim();
+      filter.$or = [
+        { orderCode: { $regex: keyword, $options: "i" } },
+        { customerName: { $regex: keyword, $options: "i" } },
+        { customerPhone: { $regex: keyword, $options: "i" } },
+      ];
+    }
+
+    const orders = await Order.find(filter)
+      .populate("userId", "firstName lastName email phone")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
       ok: true,
-      orders,
+      orders: orders.map(mapOrderResponse),
     });
   } catch (error) {
     return res.status(500).json({
@@ -806,26 +862,40 @@ exports.updateAdminOrderStatus = async (req, res) => {
       });
     }
 
+    if (
+      order.paymentMethod === "MOMO" &&
+      order.paymentStatus !== "PAID" &&
+      ["SHIPPING", "SUCCESS"].includes(orderStatus)
+    ) {
+      return res.status(400).json({
+        ok: false,
+        message:
+          "Đơn hàng MoMo chưa được xác nhận thanh toán, chưa thể duyệt giao hoặc hoàn tất",
+      });
+    }
+
     order.orderStatus = orderStatus;
 
     if (orderStatus === "SUCCESS") {
-      if (order.paymentMethod === "MOMO") {
-        order.paymentStatus = "PAID";
-      } else {
-        order.paymentStatus = "UNPAID";
-      }
+      order.paymentStatus = "PAID";
     }
 
-    if (orderStatus === "CANCELLED" && order.paymentMethod !== "MOMO") {
+    if (orderStatus === "CANCELLED" && order.paymentMethod === "COD") {
       order.paymentStatus = "UNPAID";
     }
+
+    order.paymentNote = getPaymentText(
+      order.paymentMethod,
+      order.paymentStatus,
+      order.orderStatus
+    );
 
     const updatedOrder = await order.save();
 
     return res.status(200).json({
       ok: true,
       message: "Cập nhật trạng thái đơn hàng thành công",
-      order: updatedOrder,
+      order: mapOrderResponse(updatedOrder),
     });
   } catch (error) {
     return res.status(500).json({
