@@ -39,6 +39,7 @@ app.use("/api/products", require("./src/routes/product.routes"));
 app.use("/api/inventory", require("./src/routes/inventory.route"));
 app.use("/api/orders", require("./src/routes/sales/order.routes"));
 app.use("/api/promotions", require("./src/routes/sales/promotion.routes"));
+app.use("/api/statistics", require("./src/routes/statistics.route"));
 
 app.get("/", (req, res) => {
   res.send("Server is running ...");

@@ -1,24 +1,5 @@
 const mongoose = require("mongoose");
 
-function calculateAge(dateOfBirth) {
-  if (!dateOfBirth) return 0;
-
-  const today = new Date();
-  const dob = new Date(dateOfBirth);
-
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < dob.getDate())
-  ) {
-    age--;
-  }
-
-  return age;
-}
-
 const userSchema = new mongoose.Schema(
   {
     firstName: {
@@ -66,29 +47,13 @@ const userSchema = new mongoose.Schema(
 
     dateOfBirth: {
       type: Date,
-      required: function () {
-        return this.role === "user";
-      },
-      validate: {
-        validator: function (value) {
-          if (this.role !== "user") return true;
-          if (!value) return false;
-          return calculateAge(value) >= 16;
-        },
-        message: "Bạn phải đủ 16 tuổi để tạo tài khoản",
-      },
+      default: null,
     },
 
     gender: {
       type: String,
       enum: ["male", "female", "other", "prefer_not_to_say"],
       default: "prefer_not_to_say",
-    },
-
-    shoppingPreference: {
-      type: String,
-      enum: ["male", "female", "both"],
-      default: "both",
     },
 
     address: {

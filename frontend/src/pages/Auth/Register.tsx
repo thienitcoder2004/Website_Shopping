@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,40 +13,7 @@ type RegisterForm = {
   phone: string;
   password: string;
   confirmPassword: string;
-  dateOfBirth: string;
-  gender: "male" | "female" | "other" | "prefer_not_to_say";
-  shoppingPreference: "male" | "female" | "both";
 };
-
-function calculateAge(dateOfBirth: string) {
-  if (!dateOfBirth) return 0;
-
-  const today = new Date();
-  const dob = new Date(dateOfBirth);
-
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < dob.getDate())
-  ) {
-    age--;
-  }
-
-  return age;
-}
-
-function getMaxBirthDate() {
-  const today = new Date();
-  const maxDate = new Date(
-    today.getFullYear() - 16,
-    today.getMonth(),
-    today.getDate()
-  );
-
-  return maxDate.toISOString().split("T")[0];
-}
 
 export default function Register() {
   const dispatch = useDispatch<AppDispatch>();
@@ -59,21 +26,14 @@ export default function Register() {
     phone: "",
     password: "",
     confirmPassword: "",
-    dateOfBirth: "",
-    gender: "prefer_not_to_say",
-    shoppingPreference: "both",
   });
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
 
-  const age = useMemo(() => calculateAge(form.dateOfBirth), [form.dateOfBirth]);
-  const isUnder16 = form.dateOfBirth ? age < 16 : false;
-  const maxBirthDate = useMemo(() => getMaxBirthDate(), []);
-
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setForm({
       ...form,
@@ -91,16 +51,6 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    if (!form.dateOfBirth) {
-      toast.error("Vui lòng chọn ngày sinh");
-      return;
-    }
-
-    if (isUnder16) {
-      toast.error("Bạn phải đủ 16 tuổi để tạo tài khoản ❌");
-      return;
-    }
-
     if (form.password !== form.confirmPassword) {
       toast.error("Mật khẩu không khớp ❌");
       return;
@@ -114,10 +64,8 @@ export default function Register() {
           email: form.email,
           phone: form.phone,
           password: form.password,
-          dateOfBirth: form.dateOfBirth,
-          gender: form.gender,
-          shoppingPreference: form.shoppingPreference,
-        })
+          confirmPassword: form.confirmPassword,
+        }),
       ).unwrap();
 
       toast.success("Đăng ký thành công 🎉");
@@ -177,55 +125,6 @@ export default function Register() {
               required
             />
 
-            <div>
-              <label className="block mb-2 font-medium">Ngày sinh</label>
-              <input
-                type="date"
-                name="dateOfBirth"
-                value={form.dateOfBirth}
-                onChange={handleChange}
-                max={maxBirthDate}
-                className="w-full border px-4 py-2"
-                required
-              />
-              {form.dateOfBirth && (
-                <p className={`mt-2 text-sm ${isUnder16 ? "text-red-600" : "text-green-600"}`}>
-                  {isUnder16
-                    ? `Bạn hiện ${age} tuổi - chưa đủ 16 tuổi để đăng ký`
-                    : `Bạn hiện ${age} tuổi - đủ điều kiện đăng ký`}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium">Giới tính</label>
-              <select
-                name="gender"
-                value={form.gender}
-                onChange={handleChange}
-                className="w-full border px-4 py-2"
-              >
-                <option value="male">Nam</option>
-                <option value="female">Nữ</option>
-                <option value="other">Khác</option>
-                <option value="prefer_not_to_say">Không muốn tiết lộ</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 font-medium">Bạn muốn xem sản phẩm</label>
-              <select
-                name="shoppingPreference"
-                value={form.shoppingPreference}
-                onChange={handleChange}
-                className="w-full border px-4 py-2"
-              >
-                <option value="male">Đồ nam</option>
-                <option value="female">Đồ nữ</option>
-                <option value="both">Cả đồ nam và đồ nữ</option>
-              </select>
-            </div>
-
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
@@ -264,12 +163,9 @@ export default function Register() {
 
             <button
               type="submit"
-              disabled={isUnder16}
-              className={`text-white px-6 py-2 w-full ${
-                isUnder16
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-orange-600"
-              }`}
+              className={
+                "bg-orange-600 text-white w-full py-2 hover:bg-orange-700 transition"
+              }
             >
               Đăng ký
             </button>

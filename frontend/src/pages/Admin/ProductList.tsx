@@ -6,7 +6,6 @@ import { cn, formatVND } from "../../utils/format";
 import { getFallbackImage, resolveImgUrl } from "../../utils/media";
 import Pagination from "../../components/common/Pagination";
 
-
 type SortKey =
   | "updatedAt"
   | "createdAt"
@@ -190,27 +189,27 @@ export default function ProductListAdmin() {
   const fetchIdRef = useRef(0);
 
   const fetchData = useCallback(async () => {
-  const myFetchId = ++fetchIdRef.current;
-  setLoading(true);
+    const myFetchId = ++fetchIdRef.current;
+    setLoading(true);
 
-  try {
-    const res = await productApi.list({ q: debouncedQ, page, limit });
+    try {
+      const res = await productApi.list({ q: debouncedQ, page, limit });
 
-    if (fetchIdRef.current !== myFetchId) return;
+      if (fetchIdRef.current !== myFetchId) return;
 
-    const paged = res.data.data;
-    setItems(paged.items);
-    setTotalPages(paged.totalPages);
-    setTotalItems(paged.total);
-    setSelected({});
-  } finally {
-    if (fetchIdRef.current === myFetchId) {
-      setLoading(false);
+      const paged = res.data.data;
+      setItems(paged.items);
+      setTotalPages(paged.totalPages);
+      setTotalItems(paged.total);
+      setSelected({});
+    } finally {
+      if (fetchIdRef.current === myFetchId) {
+        setLoading(false);
+      }
     }
-  }
-}, [debouncedQ, page, limit]);
+  }, [debouncedQ, page, limit]);
 
-    useEffect(() => {
+  useEffect(() => {
     void fetchData();
   }, [fetchData]);
   const getDisplayPrice = (p: TProduct) =>
@@ -317,7 +316,7 @@ export default function ProductListAdmin() {
     <div className="">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(1200px_circle_at_10%_10%,rgba(99,102,241,0.16),transparent_46%),radial-gradient(900px_circle_at_90%_20%,rgba(16,185,129,0.12),transparent_40%),radial-gradient(900px_circle_at_60%_90%,rgba(245,158,11,0.12),transparent_40%),linear-gradient(to_bottom,#f8fafc,#f8fafc)]" />
 
-      <div className="mx-auto max-w-[1320px] p-4 md:p-6">
+      <div className="p-4 md:p-6">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center">
           <div className="inline-flex items-center gap-3">
             <div className="grid h-11 w-11 place-items-center rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-400 text-white shadow-[0_10px_25px_-12px_rgba(99,102,241,0.6)]">
@@ -328,7 +327,8 @@ export default function ProductListAdmin() {
                 Products
               </h2>
               <p className="text-sm text-slate-600">
-                Quản lý danh sách sản phẩm, tồn kho, giá, trạng thái và đánh giá.
+                Quản lý danh sách sản phẩm, tồn kho, giá, trạng thái và đánh
+                giá.
               </p>
             </div>
           </div>
@@ -538,7 +538,9 @@ export default function ProductListAdmin() {
 
               <tbody className="divide-y divide-slate-100">
                 {loading &&
-                  Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)}
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonRow key={i} />
+                  ))}
 
                 {!loading &&
                   viewItems.map((p) => {
@@ -604,15 +606,21 @@ export default function ProductListAdmin() {
 
                                 {hasSale && <Badge tone="amber">SALE</Badge>}
 
-                                {reviewCount > 0 && <Badge tone="indigo">REVIEWED</Badge>}
+                                {reviewCount > 0 && (
+                                  <Badge tone="indigo">REVIEWED</Badge>
+                                )}
                               </div>
 
                               <div className="mt-0.5 truncate text-xs text-slate-500">
-                                <span className="font-medium">Slug:</span> {p.slug || "-"}
+                                <span className="font-medium">Slug:</span>{" "}
+                                {p.slug || "-"}
                                 {p.sku ? (
                                   <>
                                     {" "}
-                                    • <span className="font-medium">SKU:</span> {p.sku}
+                                    • <span className="font-medium">
+                                      SKU:
+                                    </span>{" "}
+                                    {p.sku}
                                   </>
                                 ) : null}
                               </div>
@@ -729,7 +737,8 @@ export default function ProductListAdmin() {
               Tip: tìm theo <b className="font-semibold">name</b>,{" "}
               <b className="font-semibold">sku</b> hoặc{" "}
               <b className="font-semibold">slug</b>. Bạn cũng có thể bấm{" "}
-              <b className="font-semibold">Đánh giá</b> để mở review theo từng sản phẩm.
+              <b className="font-semibold">Đánh giá</b> để mở review theo từng
+              sản phẩm.
             </div>
 
             <div className="flex items-center gap-2">

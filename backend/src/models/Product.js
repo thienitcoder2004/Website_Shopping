@@ -24,6 +24,13 @@ const ProductSchema = new mongoose.Schema(
             ref: "Brand",
         },
 
+        gender: {
+            type: String,
+            enum: ["nam", "nu", "unisex"],
+            default: "unisex",
+            index: true,
+        },
+
         stock: { type: Number, default: 0, min: 0 },
         warehouseStock: { type: Number, default: 0, min: 0 },
 
@@ -35,7 +42,7 @@ const ProductSchema = new mongoose.Schema(
         reviewCount: { type: Number, default: 0, min: 0 },
 
         isActive: { type: Boolean, default: true },
-
+        sold: { type: Number, default: 0 },
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
         updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     },

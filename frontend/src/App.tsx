@@ -48,6 +48,7 @@ import ProductListAdmin from "./pages/Admin/ProductList";
 import ProductForm from "./pages/Admin/ProductForm";
 import OrdersPage from "./pages/Admin/OrdersPage";
 import ReviewsPage from "./pages/Admin/ReviewsPage";
+import StatisticsPage from "./pages/Admin/StatisticsPage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +80,7 @@ export default function App() {
 
           <Route path="/products" element={<ProductList />} />
           <Route path="/products/:slug" element={<ProductDetail />} />
+          <Route path="/product/:gender" element={<ProductList />} />
 
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/cart" element={<ShoppingCart />} />
@@ -172,7 +174,7 @@ export default function App() {
             path="statistics"
             element={
               <RoleRoute allow={["admin"]}>
-                <div>Thống kê</div>
+                <StatisticsPage />
               </RoleRoute>
             }
           />

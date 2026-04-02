@@ -43,9 +43,7 @@ type RegisterPayload = {
   email: string;
   phone: string;
   password: string;
-  dateOfBirth: string;
-  gender: "male" | "female" | "other" | "prefer_not_to_say";
-  shoppingPreference: "male" | "female" | "both";
+  confirmPassword: string;
 };
 
 type UpdateProfilePayload = {

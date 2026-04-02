@@ -11,7 +11,10 @@ export type ProductListParams = {
   sort?: string;
   categoryId?: string;
   categorySlug?: string;
+  gender?: string; 
 };
+
+
 
 export type TProductReviewReply = {
   _id: string;
