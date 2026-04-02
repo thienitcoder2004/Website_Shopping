@@ -45,31 +45,30 @@ exports.register = async (req, res) => {
       email,
       phone,
       password,
-      dateOfBirth,
-      gender,
-      shoppingPreference,
+      confirmPassword
     } = req.body;
 
+    // VALIDATE
     if (
       !firstName ||
       !lastName ||
       !email ||
       !phone ||
       !password ||
-      !dateOfBirth
+      !confirmPassword
     ) {
       return res.status(400).json({
-        message: "Vui lòng nhập đầy đủ thông tin bắt buộc",
+        message: "Vui lòng nhập đầy đủ thông tin",
       });
     }
 
-    if (!isAtLeast16(dateOfBirth)) {
+    if (password !== confirmPassword) {
       return res.status(400).json({
-        message: "Bạn phải đủ 16 tuổi để tạo tài khoản",
+        message: "Mật khẩu không khớp",
       });
     }
 
-    const normalizedEmail = String(email).toLowerCase().trim();
+    const normalizedEmail = email.toLowerCase().trim();
 
     const exist = await User.findOne({ email: normalizedEmail });
     if (exist) {
@@ -78,39 +77,23 @@ exports.register = async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 12);
 
-    // Luôn đăng ký tài khoản mới với role = user
     const user = await User.create({
-      firstName: String(firstName).trim(),
-      lastName: String(lastName).trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       email: normalizedEmail,
-      phone: String(phone).trim(),
+      phone: phone.trim(),
       password: hashed,
       role: "user",
       provider: "local",
-      dateOfBirth,
-      gender: gender || "prefer_not_to_say",
-      shoppingPreference: shoppingPreference || "both",
-      avatar: "",
     });
 
     return res.json({
       message: "Đăng ký thành công",
       token: generateToken(user),
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        phone: user.phone,
-        address: user.address,
-        avatar: user.avatar,
-        dateOfBirth: user.dateOfBirth,
-        gender: user.gender,
-        shoppingPreference: user.shoppingPreference,
-      },
+      user: user,
     });
   } catch (err) {
+    console.log("REGISTER ERROR:", err);
     return res.status(500).json({ message: err.message });
   }
 };

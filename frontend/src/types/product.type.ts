@@ -10,7 +10,7 @@ export type TProduct = {
 
   price: number;
   salePrice?: number;
-
+  gender?: string;
   images: string[];
 
   categoryId?: TObjectId;

@@ -408,6 +408,12 @@ exports.createCashOrder = async (req, res) => {
     await markCouponUsedIfNeeded(order);
     await markPromotionsSoldIfNeeded(order);
 
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(item.productId, {
+        $inc: { sold: item.quantity }
+      });
+    }
+
     return res.status(201).json({
       ok: true,
       message: "Đặt hàng tiền mặt thành công",
@@ -643,6 +649,11 @@ exports.momoIpn = async (req, res) => {
     if (Number(data.resultCode) === 0) {
       order.paymentStatus = "PAID";
       order.paymentNote = getPaymentText("MOMO", "PAID", order.orderStatus);
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { sold: item.quantity }
+        });
+      }
       await order.save();
 
       await markCouponUsedIfNeeded(order);

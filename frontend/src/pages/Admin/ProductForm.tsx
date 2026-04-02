@@ -7,6 +7,8 @@ import { getBrands, type Brand } from "../../api/brand.api";
 import type { TProduct } from "../../types/product.type";
 import { uploadFiles } from "../../api/upload.api";
 import { apiFile } from "../../utils/apiFile";
+import { Input } from "../../components/common/Input";
+import { Select } from "../../components/common/Select";
 
 type FormState = {
   name: string;
@@ -21,6 +23,7 @@ type FormState = {
 
   isActive: boolean;
   stock: number;
+  gender: string;
 
   colorsText: string;
   sizesText: string;
@@ -37,7 +40,7 @@ type ProductUpsertPayload = {
 
   price: number;
   salePrice?: number;
-
+  gender?: string;
   categoryId: string;
   brandId?: string;
 
@@ -58,6 +61,7 @@ const emptyState: FormState = {
   description: "",
   price: 0,
   salePrice: 0,
+  gender: "unisex",
 
   categoryId: "",
   brandId: "",
@@ -174,7 +178,7 @@ export default function ProductForm() {
 
           categoryId: pickId(p.categoryId),
           brandId: pickId(p.brandId),
-
+          gender: p.gender || "unisex",
           isActive: Boolean(p.isActive),
           stock: p.stock || 0,
 
@@ -276,6 +280,7 @@ export default function ProductForm() {
       slug: state.slug.trim() || undefined,
       sku: state.sku.trim() || undefined,
       description: state.description,
+      gender: state.gender,
 
       price: Number(state.price || 0),
       salePrice: Number(state.salePrice || 0) || undefined,
@@ -310,15 +315,16 @@ export default function ProductForm() {
   };
 
   return (
-    <div className="max-w-5xl p-4">
-      <div className="mb-4 flex items-center gap-3">
-        <h2 className="text-xl font-bold">
-          {isNew ? "Thêm sản phẩm" : "Cập nhật sản phẩm"}
+    <div className="mx-auto max-w-6xl p-6">
+      {/* HEADER */}
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-800">
+          {isNew ? "➕ Thêm sản phẩm" : "✏️ Cập nhật sản phẩm"}
         </h2>
 
-        <div className="ml-auto flex gap-2">
+        <div className="flex gap-3">
           <Link to="/admin/products">
-            <button className="rounded-lg border px-3 py-2 hover:bg-gray-50">
+            <button className="rounded-xl border px-4 py-2 text-sm hover:bg-gray-100">
               ← Danh sách
             </button>
           </Link>
@@ -326,232 +332,204 @@ export default function ProductForm() {
           <button
             onClick={onSubmit}
             disabled={loading}
-            className="rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
+            className="rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 px-5 py-2 font-semibold text-white shadow hover:opacity-90 disabled:opacity-60"
           >
-            {loading ? "Đang lưu..." : "Lưu"}
+            {loading ? "Đang lưu..." : "💾 Lưu"}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Field label="Tên">
-          <input
-            value={state.name}
-            onChange={(e) => setField("name", e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
+      {/* FORM */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* LEFT */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* BASIC INFO */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-semibold text-gray-700">
+              Thông tin cơ bản
+            </h3>
 
-        <Field label="Slug (bỏ trống để tự tạo)">
-          <input
-            value={state.slug}
-            onChange={(e) => setField("slug", e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="SKU">
-          <input
-            value={state.sku}
-            onChange={(e) => setField("sku", e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="Tồn kho (stock chung)">
-          <input
-            type="number"
-            value={state.stock}
-            onChange={(e) => setField("stock", Number(e.target.value))}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="Giá">
-          <input
-            type="number"
-            value={state.price}
-            onChange={(e) => setField("price", Number(e.target.value))}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="Giá sale">
-          <input
-            type="number"
-            value={state.salePrice}
-            onChange={(e) => setField("salePrice", Number(e.target.value))}
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="Danh mục">
-          <select
-            value={state.categoryId}
-            onChange={(e) => setField("categoryId", e.target.value)}
-            className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          >
-            {!categories.length && <option value="">(Chưa có danh mục)</option>}
-            {categories.map((c) => (
-              <option key={c._id} value={c._id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Thương hiệu (tuỳ chọn)">
-          <select
-            value={state.brandId}
-            onChange={(e) => setField("brandId", e.target.value)}
-            className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          >
-            <option value="">(Không chọn)</option>
-            {brands.map((b) => (
-              <option key={b._id} value={b._id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Trạng thái">
-          <select
-            value={String(state.isActive)}
-            onChange={(e) => setField("isActive", e.target.value === "true")}
-            className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          >
-            <option value="true">Bật bán</option>
-            <option value="false">Tắt bán</option>
-          </select>
-        </Field>
-
-        <Field label="Màu (phân cách dấu phẩy)">
-          <input
-            value={state.colorsText}
-            onChange={(e) => setField("colorsText", e.target.value)}
-            placeholder="Navy, Gray"
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <Field label="Size (phân cách dấu phẩy)">
-          <input
-            value={state.sizesText}
-            onChange={(e) => setField("sizesText", e.target.value)}
-            placeholder="S, M, L, XL"
-            className="w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </Field>
-
-        <div className="md:col-span-2">
-          <label className="mb-1 block text-sm font-semibold">Mô tả</label>
-          <textarea
-            value={state.description}
-            onChange={(e) => setField("description", e.target.value)}
-            className="min-h-[120px] w-full rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-orange-200"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-semibold">Ảnh sản phẩm</div>
-
-            <label className="ml-auto">
-              <input
-                id="product-files"
-                type="file"
-                multiple
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => onPickFiles(e.target.files)}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Input
+                label="Tên"
+                value={state.name}
+                onChange={(v) => setField("name", v)}
               />
-              <span className="cursor-pointer rounded-lg border px-4 py-2 hover:bg-gray-50">
-                + Chọn ảnh / Upload
-              </span>
-            </label>
+              <Input
+                label="Slug"
+                value={state.slug}
+                onChange={(v) => setField("slug", v)}
+              />
+              <Input
+                label="SKU"
+                value={state.sku}
+                onChange={(v) => setField("sku", v)}
+              />
+              <Input
+                label="Tồn kho"
+                type="number"
+                value={state.stock}
+                onChange={(v) => setField("stock", Number(v))}
+              />
+              <Input
+                label="Giá"
+                type="number"
+                value={state.price}
+                onChange={(v) => setField("price", Number(v))}
+              />
+              <Input
+                label="Giá sale"
+                type="number"
+                value={state.salePrice}
+                onChange={(v) => setField("salePrice", Number(v))}
+              />
+            </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="rounded-xl border p-2">
-              <div className="mb-2 text-xs font-bold">PRIMARY</div>
+          {/* CATEGORY */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-semibold text-gray-700">Phân loại</h3>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <Select
+                label="Danh mục"
+                value={state.categoryId}
+                onChange={(v) => setField("categoryId", v)}
+                options={categories.map((c) => ({
+                  value: c._id,
+                  label: c.name,
+                }))}
+              />
+
+              <Select
+                label="Thương hiệu"
+                value={state.brandId}
+                onChange={(v) => setField("brandId", v)}
+                options={[
+                  { value: "", label: "(Không chọn)" },
+                  ...brands.map((b) => ({
+                    value: b._id,
+                    label: b.name,
+                  })),
+                ]}
+              />
+
+              <Select
+                label="Giới tính"
+                value={state.gender}
+                onChange={(v) => setField("gender", v)}
+                options={[
+                  { value: "male", label: "Nam" },
+                  { value: "female", label: "Nữ" },
+                  { value: "unisex", label: "Unisex" },
+                ]}
+              />
+
+              <Select
+                label="Trạng thái"
+                value={String(state.isActive)}
+                onChange={(v) => setField("isActive", v === "true")}
+                options={[
+                  { value: "true", label: "Bật bán" },
+                  { value: "false", label: "Tắt bán" },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* DESCRIPTION */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-semibold text-gray-700">Mô tả</h3>
+
+            <textarea
+              value={state.description}
+              onChange={(e) => setField("description", e.target.value)}
+              className="w-full rounded-xl border p-3 focus:ring-2 focus:ring-orange-200"
+              rows={5}
+            />
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div className="space-y-6">
+          {/* ATTRIBUTES */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <h3 className="mb-4 font-semibold text-gray-700">Thuộc tính</h3>
+
+            <Input
+              label="Màu sắc"
+              value={state.colorsText}
+              onChange={(v) => setField("colorsText", v)}
+              placeholder="Đỏ, Xanh"
+            />
+
+            <Input
+              label="Size"
+              value={state.sizesText}
+              onChange={(v) => setField("sizesText", v)}
+              placeholder="S, M, L"
+            />
+          </div>
+
+          {/* IMAGE */}
+          <div className="rounded-2xl border bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center">
+              <h3 className="font-semibold text-gray-700">Ảnh sản phẩm</h3>
+
+              <label className="ml-auto cursor-pointer rounded-lg border px-3 py-1 text-sm hover:bg-gray-100">
+                Upload
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => onPickFiles(e.target.files)}
+                />
+              </label>
+            </div>
+
+            {/* PRIMARY */}
+            <div className="mb-4">
               {state.primaryImage ? (
                 <img
                   src={apiFile(state.primaryImage)}
-                  alt="primary"
-                  className="h-[260px] w-full rounded-lg border object-cover"
+                  className="h-48 w-full rounded-xl object-cover shadow"
                 />
               ) : (
-                <div className="flex h-[260px] w-full items-center justify-center rounded-lg border text-gray-400">
-                  Chưa chọn ảnh chính
-                </div>
-              )}
-
-              <div className="mt-2 text-xs text-gray-600">
-                Click ảnh ở Gallery để đặt làm Primary
-              </div>
-            </div>
-
-            <div className="rounded-xl border p-2">
-              <div className="mb-2 text-xs font-bold">GALLERY</div>
-
-              {!state.images.length ? (
-                <div className="text-sm text-gray-400">Chưa có ảnh phụ</div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  {state.images.map((u) => (
-                    <div key={u} className="group relative">
-                      <button
-                        type="button"
-                        onClick={() => setPrimary(u)}
-                        className="block w-full"
-                      >
-                        <img
-                          src={apiFile(u)}
-                          alt="gallery"
-                          className="h-24 w-full rounded-md border object-cover group-hover:border-black"
-                        />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => removeGallery(u)}
-                        className="absolute right-1 top-1 rounded bg-black/70 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100"
-                        title="Xóa"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
+                <div className="flex h-48 items-center justify-center rounded-xl border text-gray-400">
+                  No image
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="mt-2 text-sm text-gray-600">
-            Giá hiển thị:{" "}
-            <span className="font-bold">
-              {pricePreview.toLocaleString("vi-VN")}₫
-            </span>
+            {/* GALLERY */}
+            <div className="grid grid-cols-3 gap-2">
+              {state.images.map((img) => (
+                <div key={img} className="group relative">
+                  <img
+                    src={apiFile(img)}
+                    onClick={() => setPrimary(img)}
+                    className="h-20 w-full cursor-pointer rounded-lg object-cover transition hover:scale-105"
+                  />
+
+                  <button
+                    onClick={() => removeGallery(img)}
+                    className="absolute right-1 top-1 hidden rounded bg-black/70 px-1 text-xs text-white group-hover:block"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 text-sm">
+              Giá hiển thị:{" "}
+              <span className="font-bold text-orange-600">
+                {pricePreview.toLocaleString("vi-VN")}₫
+              </span>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-semibold">{label}</label>
-      {children}
     </div>
   );
 }

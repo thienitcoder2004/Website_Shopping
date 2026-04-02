@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom"; // 🔥 thêm useParams
 import { productApi } from "../../../api/product.api";
 import type { TProduct } from "../../../types/product.type";
 import { apiFile } from "../../../utils/apiFile";
@@ -30,6 +30,8 @@ function formatPrice(value: number) {
 }
 
 export default function ProductList() {
+  const { gender } = useParams(); // 🔥 lấy từ URL
+
   const [items, setItems] = useState<ProductWithPricing[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -37,11 +39,14 @@ export default function ProductList() {
     const run = async () => {
       try {
         setLoading(true);
+
         const res = await productApi.list({
           page: 1,
           limit: 60,
           isActive: true,
+          gender, // 🔥 thêm dòng này
         });
+
         setItems((res.data.data.items ?? []) as ProductWithPricing[]);
       } finally {
         setLoading(false);
@@ -49,11 +54,21 @@ export default function ProductList() {
     };
 
     void run();
-  }, []);
+  }, [gender]); // 🔥 thêm dependency
 
   return (
     <div className="max-w-6xl mx-auto p-4">
-      <h2 className="text-xl font-bold mb-4">Sản phẩm</h2>
+      {/* 🔥 title dynamic */}
+      <h2 className="text-xl font-bold mb-4">
+        Sản phẩm{" "}
+        {gender === "nam"
+          ? "Nam"
+          : gender === "nu"
+            ? "Nữ"
+            : gender === "unisex"
+              ? "Unisex"
+              : ""}
+      </h2>
 
       {loading ? (
         <div className="text-gray-500">Đang tải sản phẩm...</div>
@@ -66,6 +81,7 @@ export default function ProductList() {
             const stock = p.stock ?? 0;
 
             const hasPromotion = !!p.activePromotion;
+
             const currentPrice = Number(
               p.finalPrice ??
                 (p.salePrice && p.salePrice > 0 ? p.salePrice : p.price) ??

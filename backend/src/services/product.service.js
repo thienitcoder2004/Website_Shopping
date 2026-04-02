@@ -201,3 +201,38 @@ exports.getBySlug = async (slug) => {
 
   return await enrichProductPromotion(doc);
 };
+
+exports.list = async (query) => {
+  const {
+    q,
+    page = 1,
+    limit = 20,
+    gender,
+  } = query;
+
+  const filter = {};
+
+  if (q) {
+    filter.name = { $regex: q, $options: "i" };
+  }
+
+  if (gender) {
+    filter.gender = gender;
+  }
+
+  const skip = (page - 1) * limit;
+
+  const [items, total] = await Promise.all([
+    Product.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+    Product.countDocuments(filter),
+  ]);
+
+  return {
+    items,
+    total,
+    totalPages: Math.ceil(total / limit),
+  };
+};
