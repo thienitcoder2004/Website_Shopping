@@ -18,6 +18,7 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../stores/authSlice";
 import type { AppDispatch, RootState } from "../stores/store";
+import NotificationBell from "../components/common/NotificationBell";
 
 type MenuRole = "admin" | "staff";
 
@@ -185,10 +186,13 @@ export default function AdminLayout() {
             {currentMenu?.name || "Quản trị hệ thống"}
           </h2>
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 flex">
+            <div className="ml-5">
+              <NotificationBell />
+            </div>
             Xin chào,{" "}
-            <span className="font-medium text-slate-700">{displayName}</span>{" "}
-            ({role === "admin" ? "Admin" : "Nhân viên"})
+            <span className="font-medium text-slate-700">{displayName}</span> (
+            {role === "admin" ? "Admin" : "Nhân viên"})
           </div>
         </header>
 

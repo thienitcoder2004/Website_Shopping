@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom"; // 🔥 thêm useParams
-import { productApi } from "../../../api/product.api";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { productApi, type ProductListParams } from "../../../api/product.api";
 import type { TProduct } from "../../../types/product.type";
 import { apiFile } from "../../../utils/apiFile";
 
@@ -9,13 +9,6 @@ type ProductPromotion = {
   name?: string;
   type?: string;
   value?: number;
-  maxDiscount?: number;
-  startDate?: string;
-  endDate?: string;
-  saleStock?: number;
-  soldCount?: number;
-  perUserLimit?: number;
-  priority?: number;
 };
 
 type ProductWithPricing = TProduct & {
@@ -30,140 +23,203 @@ function formatPrice(value: number) {
 }
 
 export default function ProductList() {
-  const { gender } = useParams(); // 🔥 lấy từ URL
+  const { gender } = useParams();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q") || "";
 
   const [items, setItems] = useState<ProductWithPricing[]>([]);
+  const [filtered, setFiltered] = useState<ProductWithPricing[]>([]);
   const [loading, setLoading] = useState(false);
+  const [keyword, setKeyword] = useState(query);
+  const [priceFilter, setPriceFilter] = useState<string[]>([]);
 
+  // 🔥 Sync keyword khi query param thay đổi
   useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
+    setKeyword(query);
+  }, [query]);
 
-        const res = await productApi.list({
+  // 🔥 LOAD PRODUCTS
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoading(true);
+      try {
+        const params: ProductListParams = {
           page: 1,
           limit: 60,
+          gender,
           isActive: true,
-          gender, // 🔥 thêm dòng này
-        });
-
-        setItems((res.data.data.items ?? []) as ProductWithPricing[]);
+          q: keyword || undefined, // filter API theo từ khóa
+        };
+        const res = await productApi.list(params);
+        const data = (res.data.data.items ?? []) as ProductWithPricing[];
+        setItems(data);
       } finally {
         setLoading(false);
       }
     };
+    void fetchProducts();
+  }, [gender, keyword]);
 
-    void run();
-  }, [gender]); // 🔥 thêm dependency
+  // 🔥 CLIENT FILTER
+  useEffect(() => {
+    let result = [...items];
+
+    if (keyword) {
+      result = result.filter((p) =>
+        p.name?.toLowerCase().includes(keyword.toLowerCase()),
+      );
+    }
+
+    if (priceFilter.length > 0) {
+      result = result.filter((p) => {
+        const price =
+          p.finalPrice ??
+          (p.salePrice && p.salePrice > 0 ? p.salePrice : p.price) ??
+          0;
+
+        return priceFilter.some((range) => {
+          if (range === "100") return price < 100000;
+          if (range === "200") return price >= 100000 && price < 200000;
+          if (range === "500") return price >= 200000 && price < 500000;
+          if (range === "1000") return price >= 500000;
+          return false;
+        });
+      });
+    }
+
+    setFiltered(result);
+  }, [keyword, priceFilter, items]);
+
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const params: ProductListParams = {
+        page: 1,
+        limit: 60,
+        gender,
+        isActive: true,
+        q: keyword,
+      };
+      const res = await productApi.list(params);
+      setItems(res.data.data.items ?? []);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const togglePrice = (value: string) => {
+    setPriceFilter((prev) =>
+      prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value],
+    );
+  };
 
   return (
-    <div className="max-w-6xl mx-auto p-4">
-      {/* 🔥 title dynamic */}
-      <h2 className="text-xl font-bold mb-4">
-        Sản phẩm{" "}
-        {gender === "nam"
-          ? "Nam"
-          : gender === "nu"
-            ? "Nữ"
-            : gender === "unisex"
-              ? "Unisex"
-              : ""}
-      </h2>
+    <div className="max-w-7xl mx-auto p-4">
+      <h2 className="text-2xl font-bold mb-4">Sản phẩm</h2>
 
-      {loading ? (
-        <div className="text-gray-500">Đang tải sản phẩm...</div>
-      ) : items.length === 0 ? (
-        <div className="text-gray-500">Chưa có sản phẩm nào</div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {items.map((p) => {
-            const thumb = p.primaryImage || p.images?.[0] || "";
-            const stock = p.stock ?? 0;
+      <div className="flex gap-6">
+        {/* FILTER LEFT */}
+        <div className="w-[250px] hidden md:block">
+          <div className="bg-white p-4 rounded-xl border space-y-4">
+            <h3 className="font-bold">Bộ lọc</h3>
 
-            const hasPromotion = !!p.activePromotion;
+            <input
+              type="text"
+              placeholder="Tìm sản phẩm..."
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+              }}
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
 
-            const currentPrice = Number(
-              p.finalPrice ??
-                (p.salePrice && p.salePrice > 0 ? p.salePrice : p.price) ??
-                0,
-            );
-
-            const comparePrice = Number(
-              p.originalPrice ??
-                (p.salePrice && p.salePrice > 0 ? p.price : 0) ??
-                0,
-            );
-
-            return (
-              <Link
-                key={p._id}
-                to={`/products/${p.slug}`}
-                className="border rounded-xl overflow-hidden bg-white hover:shadow-sm transition group"
-              >
-                <div className="relative h-[240px] bg-gray-50 overflow-hidden">
-                  {thumb ? (
-                    <img
-                      src={apiFile(thumb)}
-                      alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-[1.02] transition"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      No image
-                    </div>
-                  )}
-
-                  {hasPromotion && (
-                    <div className="absolute top-2 left-2">
-                      <span className="inline-block px-2 py-1 rounded-md bg-red-500 text-white text-xs font-bold shadow">
-                        {p.activePromotion?.type === "percentage"
-                          ? `-${p.activePromotion?.value || 0}%`
-                          : p.activePromotion?.name || "Flash Sale"}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-3">
-                  <div className="font-bold line-clamp-2 min-h-[44px]">
-                    {p.name}
-                  </div>
-
-                  <div className="mt-2">
-                    {(hasPromotion ||
-                      (p.salePrice && p.salePrice > 0 && comparePrice > 0)) &&
-                    comparePrice > currentPrice ? (
-                      <div className="space-y-1">
-                        <div className="font-extrabold text-orange-600">
-                          {formatPrice(currentPrice)}
-                        </div>
-                        <div className="text-sm text-gray-500 line-through">
-                          {formatPrice(comparePrice)}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="font-extrabold">
-                        {formatPrice(currentPrice)}
-                      </div>
-                    )}
-                  </div>
-
-                  {hasPromotion && p.activePromotion?.name && (
-                    <div className="mt-1 text-xs text-red-500 font-semibold line-clamp-1">
-                      {p.activePromotion.name}
-                    </div>
-                  )}
-
-                  <div className="mt-1 text-xs text-gray-600">
-                    {stock > 0 ? `Còn hàng: ${stock}` : "Hết hàng"}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+            <div>
+              <div className="font-semibold mb-2">Khoảng giá</div>
+              <div className="space-y-2 text-sm">
+                <label className="flex gap-2">
+                  <input type="checkbox" onChange={() => togglePrice("100")} />
+                  Dưới 100.000
+                </label>
+                <label className="flex gap-2">
+                  <input type="checkbox" onChange={() => togglePrice("200")} />
+                  100.000 - 200.000
+                </label>
+                <label className="flex gap-2">
+                  <input type="checkbox" onChange={() => togglePrice("500")} />
+                  200.000 - 500.000
+                </label>
+                <label className="flex gap-2">
+                  <input type="checkbox" onChange={() => togglePrice("1000")} />
+                  Trên 500.000
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* PRODUCT GRID */}
+        <div className="flex-1">
+          {loading ? (
+            <div>Đang tải...</div>
+          ) : filtered.length === 0 ? (
+            <div>Không có sản phẩm</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filtered.map((p, idx) => {
+                const thumb = p.primaryImage || p.images?.[0] || "";
+                const stock = p.stock ?? 0;
+                const currentPrice =
+                  p.finalPrice ??
+                  (p.salePrice && p.salePrice > 0 ? p.salePrice : p.price) ??
+                  0;
+                const comparePrice =
+                  p.originalPrice ??
+                  (p.salePrice && p.salePrice > 0 ? p.price : 0) ??
+                  0;
+
+                return (
+                  <Link
+                    key={p._id || `${p.name}-${idx}`}
+                    to={`/products/${p.slug}`}
+                    className="border rounded-xl overflow-hidden bg-white hover:shadow-md"
+                  >
+                    <div className="h-[220px] bg-gray-100">
+                      <img
+                        src={apiFile(thumb)}
+                        className="w-full h-full object-cover"
+                        alt={p.name}
+                      />
+                    </div>
+                    <div className="p-3">
+                      <div className="font-semibold line-clamp-2">{p.name}</div>
+                      <div className="mt-2">
+                        {comparePrice > currentPrice ? (
+                          <>
+                            <div className="text-orange-600 font-bold">
+                              {formatPrice(currentPrice)}
+                            </div>
+                            <div className="text-sm line-through text-gray-400">
+                              {formatPrice(comparePrice)}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="font-bold">
+                            {formatPrice(currentPrice)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {stock > 0 ? `Còn ${stock}` : "Hết hàng"}
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

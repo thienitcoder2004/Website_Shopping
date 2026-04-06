@@ -4,17 +4,26 @@ import axiosClient from "./axios.config";
 export type { TProduct };
 
 export type ProductListParams = {
-  q?: string;
+  q?: string; // ✅ thay keyword thành q
   page?: number;
   limit?: number;
   isActive?: boolean | "true" | "false";
   sort?: string;
   categoryId?: string;
   categorySlug?: string;
-  gender?: string; 
+  gender?: string;
 };
 
-
+// export type ProductListParams = {
+//   q?: string;
+//   page?: number;
+//   limit?: number;
+//   isActive?: boolean | "true" | "false";
+//   sort?: string;
+//   categoryId?: string;
+//   categorySlug?: string;
+//   gender?: string; 
+// };
 
 export type TProductReviewReply = {
   _id: string;

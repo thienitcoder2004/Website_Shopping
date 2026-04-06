@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu, X, Search, ShoppingBag, Phone } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { logout } from "../stores/authSlice";
 
@@ -8,6 +8,9 @@ import logo from "../assets/images/logo.png";
 import type { RootState } from "../stores/store";
 
 import { useCart } from "../context/cart.context";
+
+import { productApi } from "../api/product.api";
+import { apiFile } from "../utils/apiFile";
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -17,6 +20,13 @@ export default function Header() {
   const dispatch = useDispatch();
 
   const { items } = useCart();
+
+  const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [showSuggest, setShowSuggest] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const navigate = useNavigate();
 
   const cartCount = useMemo(() => {
     return items.reduce((sum, it) => sum + (it.quantity ?? 0), 0);
@@ -31,6 +41,37 @@ export default function Header() {
     location.pathname.includes(keyword)
       ? "text-orange-500 border-b-2 border-orange-500 pb-1"
       : "hover:text-orange-500";
+
+  useEffect(() => {
+    const timeout = setTimeout(async () => {
+      if (!search.trim()) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        const res = await productApi.list({
+          keyword: search,
+          limit: 5,
+        });
+        setSuggestions(res.data.data.items || []);
+      } catch (err) {
+        console.log(err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  // click outside => close suggest
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setShowSuggest(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="w-full shadow-sm">
@@ -106,23 +147,59 @@ export default function Header() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-4 md:gap-6">
-            <div className="hidden md:block relative">
+          <div className="flex items-center gap-4 md:gap-6 relative" ref={ref}>
+            {/* ===== SEARCH INPUT ===== */}
+            <div className="hidden md:block relative w-[260px]">
               <input
                 type="text"
-                placeholder="Tìm kiếm..."
-                className="border-b outline-none pr-8 py-1 text-sm"
+                placeholder="Tìm sản phẩm..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setShowSuggest(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    navigate(`/search?q=${encodeURIComponent(search)}`);
+                    setShowSuggest(false);
+                  }
+                }}
+                className="w-full border-b outline-none pr-8 py-1 text-sm"
               />
               <Search
                 size={18}
-                className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500"
+                onClick={() => {
+                  navigate(`/search?q=${encodeURIComponent(search)}`);
+                  setShowSuggest(false);
+                }}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-500 cursor-pointer"
               />
+
+              {/* ===== DROPDOWN SUGGESTIONS ===== */}
+              {showSuggest && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 w-full bg-white shadow-lg rounded-lg mt-2 z-50">
+                  {suggestions.map((p) => (
+                    <Link
+                      key={p._id}
+                      to={`/products/${p.slug}`}
+                      onClick={() => setShowSuggest(false)}
+                      className="flex items-center gap-3 p-2 hover:bg-gray-100"
+                    >
+                      <img
+                        src={apiFile(p.primaryImage || p.images?.[0])}
+                        alt={p.name}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                      <div className="text-sm line-clamp-1">{p.name}</div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ✅ CART ICON + COUNT */}
             <Link to="/cart" className="relative">
               <ShoppingBag size={22} />
-
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs min-w-5 h-5 px-1 flex items-center justify-center rounded-full">
                   {cartCount > 99 ? "99+" : cartCount}
