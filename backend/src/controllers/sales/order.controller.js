@@ -4,6 +4,8 @@ const User = require("../../models/User");
 const Order = require("../../models/sales/Order");
 const Coupon = require("../../models/sales/Coupon");
 const Promotion = require("../../models/sales/Promotion");
+const { getIO } = require("../../socket/socket");
+const { createNotification } = require("../notification.controller");
 
 function buildOrderCode() {
   return `DH${Date.now()}`;
@@ -405,6 +407,15 @@ exports.createCashOrder = async (req, res) => {
       note: note || "",
     });
 
+    await createNotification(
+      {
+        title: "🛎️ Đơn hàng mới",
+        message: `Khách ${customerName} vừa đặt đơn COD`,
+        type: "order",
+      },
+      getIO()
+    );
+
     await markCouponUsedIfNeeded(order);
     await markPromotionsSoldIfNeeded(order);
 
@@ -576,6 +587,15 @@ exports.createMomoPayment = async (req, res) => {
       },
     });
 
+    await createNotification(
+      {
+        title: "💰 Đơn hàng MoMo",
+        message: `Khách ${customerName} vừa tạo đơn thanh toán`,
+        type: "order",
+      },
+      getIO()
+    );
+
     return res.status(201).json({
       ok: true,
       message: "Tạo thanh toán MoMo thành công",
@@ -656,6 +676,14 @@ exports.momoIpn = async (req, res) => {
       }
       await order.save();
 
+      await createNotification(
+        {
+          title: "✅ Thanh toán thành công",
+          message: `Đơn ${order.orderCode} đã thanh toán`,
+          type: "payment",
+        },
+        getIO()
+      );
       await markCouponUsedIfNeeded(order);
       await markPromotionsSoldIfNeeded(order);
     } else {
@@ -902,6 +930,15 @@ exports.updateAdminOrderStatus = async (req, res) => {
     );
 
     const updatedOrder = await order.save();
+
+    await createNotification(
+      {
+        title: "📦 Cập nhật đơn hàng",
+        message: `Đơn ${order.orderCode} → ${orderStatus}`,
+        type: "order",
+      },
+      getIO()
+    );
 
     return res.status(200).json({
       ok: true,
