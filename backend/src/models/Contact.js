@@ -35,7 +35,7 @@ const contactSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "resolved"],
+      enum: ["pending", "replied", "resolved"],
       default: "pending",
     },
   },
