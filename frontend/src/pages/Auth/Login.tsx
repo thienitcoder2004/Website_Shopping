@@ -29,6 +29,10 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
+  const isValidGmail = (email: string) => {
+    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -40,6 +44,11 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!isValidGmail(form.email)) {
+      toast.error("Email phải là @gmail.com ❌");
+      return;
+    }
 
     try {
       const result = await dispatch(login(form)).unwrap();

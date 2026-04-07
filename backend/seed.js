@@ -11,8 +11,6 @@ const Coupon = require("./src/models/sales/Coupon");
 const Order = require("./src/models/sales/Order");
 const Promotion = require("./src/models/sales/Promotion");
 const ProductReview = require("./src/models/ProductReview");
-
-// NEW
 const News = require("./src/models/News");
 const Contact = require("./src/models/Contact");
 
@@ -23,19 +21,57 @@ const slugify = (text) =>
 const rand = (min, max) => Math.floor(Math.random() * (max - min) + min);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-// ===== DATA =====
-const productNames = [
-    "Áo thun basic cotton",
-    "Áo hoodie form rộng",
-    "Quần jean rách gối",
-    "Áo sơ mi Hàn Quốc",
-    "Áo khoác bomber",
-    "Quần short kaki",
-    "Áo polo nam",
-    "Áo len mùa đông",
-    "Chân váy xếp ly",
-    "Đầm nữ nhẹ nhàng",
+// ===== ẢNH =====
+const productImages = Array.from({ length: 63 }).map(
+    (_, i) => `/uploads/product/p${i + 1}.png`
+);
+
+const newsImages = Array.from({ length: 30 }).map(
+    (_, i) => `/uploads/news/news${i + 1}.png`
+);
+
+// 🔥 ẢNH SALE
+const saleImages = Array.from({ length: 30 }).map(
+    (_, i) => `/uploads/sale/sale${i + 1}.png`
+);
+
+// ===== PRODUCT NAMES =====
+const baseNames = [
+    "Áo thun basic",
+    "Áo hoodie",
+    "Quần jean",
+    "Áo sơ mi",
+    "Áo khoác",
+    "Quần short",
+    "Áo polo",
+    "Áo len",
+    "Chân váy",
+    "Đầm nữ",
 ];
+
+const productNames = [];
+for (let i = 0; i < 30; i++) {
+    productNames.push(baseNames[i % baseNames.length] + " " + (i + 1));
+}
+
+// ===== NEWS =====
+const newsTitles = [
+    "Top outfit streetwear",
+    "Phối hoodie chuẩn Hàn",
+    "Trend thời trang nam",
+    "Mix đồ Gen Z",
+    "Áo thun must-have",
+    "Jean rách còn hot?",
+    "Style basic xịn",
+    "Streetwear Việt Nam",
+    "Outfit hẹn hò",
+    "Outfit đi học",
+];
+
+const newsList = [];
+for (let i = 0; i < 30; i++) {
+    newsList.push(newsTitles[i % newsTitles.length] + " " + (i + 1));
+}
 
 const brandNames = [
     "DirtyCoins",
@@ -53,6 +89,7 @@ const brandNames = [
 const colors = ["Đen", "Trắng", "Xanh", "Be", "Nâu", "Xám"];
 const sizes = ["S", "M", "L", "XL"];
 
+// ===== MAIN =====
 const seedData = async () => {
     try {
         await connectDB();
@@ -108,7 +145,8 @@ const seedData = async () => {
 
         // ===== PRODUCT =====
         const products = [];
-        for (let i = 0; i < 10; i++) {
+
+        for (let i = 0; i < 30; i++) {
             const price = rand(150000, 600000);
 
             products.push({
@@ -116,10 +154,16 @@ const seedData = async () => {
                 slug: slugify(productNames[i]) + "-" + rand(1, 999),
                 price,
                 salePrice: price - rand(10000, 80000),
-                primaryImage: `/uploads/product-${i + 1}.jpg`,
-                images: [`/uploads/product-${i + 1}.jpg`],
+
+                primaryImage: productImages[i],
+                images: [
+                    productImages[i],
+                    productImages[(i + 1) % 30],
+                    productImages[(i + 2) % 30],
+                ],
+
                 categoryId: pick(categories)._id,
-                brandId: brands[i]._id,
+                brandId: pick(brands)._id,
                 stock: rand(10, 50),
                 warehouseStock: rand(50, 200),
                 colors: [pick(colors), pick(colors)],
@@ -132,6 +176,23 @@ const seedData = async () => {
 
         const createdProducts = await Product.insertMany(products);
 
+        // ===== NEWS =====
+        await News.insertMany(
+            newsList.map((title, i) => ({
+                title,
+                slug: slugify(title) + "-" + i,
+                content: `
+          <h2>${title}</h2>
+          <p>Xu hướng thời trang mới nhất 2026.</p>
+          <img src="${newsImages[i]}" />
+          <p>Phong cách trẻ trung năng động.</p>
+        `,
+                thumbnail: newsImages[i],
+                authorId: users[0]._id,
+                tags: ["fashion", "trend"],
+            }))
+        );
+
         // ===== COUPON =====
         await Coupon.insertMany([
             {
@@ -143,134 +204,35 @@ const seedData = async () => {
                 startDate: new Date(),
                 endDate: new Date("2026-12-31"),
             },
-            {
-                code: "FREESHIP",
-                type: "fixed",
-                value: 30000,
-                startDate: new Date(),
-                endDate: new Date("2026-12-31"),
-            },
-            ...Array.from({ length: 8 }).map((_, i) => ({
-                code: `SALE${i}`,
-                type: pick(["percentage", "fixed"]),
-                value: rand(10, 50),
-                startDate: new Date(),
-                endDate: new Date("2026-12-31"),
-            })),
         ]);
 
-        // ===== PROMOTION =====
+        // ===== PROMOTION (🔥 có ảnh SALE) =====
         await Promotion.insertMany(
-            createdProducts.map((p) => ({
-                name: `Flash Sale ${p.name}`,
-                type: "percentage",
-                value: rand(10, 30),
-                maxDiscount: 50000,
-                startDate: new Date(),
-                endDate: new Date("2026-12-31"),
-                productIds: [p._id],
-                saleStock: rand(20, 100),
-            }))
-        );
-
-        // ===== ORDER =====
-        await Order.insertMany(
-            Array.from({ length: 10 }).map((_, i) => {
-                const product = pick(createdProducts);
-                const qty = rand(1, 3);
+            createdProducts.map((p, i) => {
+                const start = new Date();
+                const end = new Date();
+                end.setDate(end.getDate() + rand(5, 15));
 
                 return {
-                    orderCode: `ORD${Date.now()}${i}`,
-                    userId: pick(users)._id,
-                    items: [
-                        {
-                            productId: product._id,
-                            name: product.name,
-                            price: product.salePrice,
-                            originalPrice: product.price,
-                            quantity: qty,
-                            color: pick(colors),
-                            size: pick(sizes),
-                            lineTotal: product.salePrice * qty,
-                        },
-                    ],
-                    subtotalAmount: product.salePrice * qty,
-                    totalAmount: product.salePrice * qty,
-                    paymentMethod: pick(["COD", "MOMO"]),
-                    customerName: "Nguyen Van B",
-                    customerPhone: "0909123456",
-                    customerAddress: "TP.HCM",
+                    name: `🔥 Flash Sale ${p.name}`,
+                    type: "percentage",
+                    value: rand(10, 40),
+                    maxDiscount: 100000,
+
+                    startDate: start,
+                    endDate: end,
+                    isActive: true,
+
+                    // 🔥 ẢNH SALE
+                    image: saleImages[i],
+
+                    productIds: [p._id],
+                    saleStock: rand(10, 50),
                 };
             })
         );
 
-        // ===== REVIEW =====
-        await ProductReview.insertMany(
-            Array.from({ length: 10 }).map(() => ({
-                productId: pick(createdProducts)._id,
-                userId: pick(users)._id,
-                rating: rand(3, 5),
-                comment: pick([
-                    "Đẹp xịn 👍",
-                    "Chất vải ok",
-                    "Đáng tiền",
-                    "Mặc rất thích",
-                    "Sẽ mua lại",
-                ]),
-                displayName: "User",
-            }))
-        );
-
-        // ===== NEWS =====
-        const newsTitles = [
-            "Top outfit streetwear 2026",
-            "Phối hoodie chuẩn Hàn",
-            "Trend thời trang nam",
-            "Mix đồ Gen Z",
-            "Áo thun must-have",
-            "Jean rách còn hot?",
-            "Style basic xịn",
-            "Streetwear VN",
-            "Outfit hẹn hò",
-            "Outfit đi học",
-        ];
-
-        await News.insertMany(
-            newsTitles.map((title, i) => ({
-                title,
-                slug: slugify(title) + "-" + i,
-                content: `Nội dung chi tiết cho "${title}"`,
-                thumbnail: `/uploads/news-${i + 1}.jpg`,
-                authorId: users[0]._id,
-                tags: ["fashion", "trend"],
-            }))
-        );
-
-        // ===== CONTACT =====
-        const messages = [
-            "Shop còn size M không?",
-            "Ship bao lâu?",
-            "Có đổi trả không?",
-            "Có màu khác không?",
-            "Có freeship không?",
-            "Shop ở đâu?",
-            "Chất liệu gì?",
-            "Có sale không?",
-            "Mua nhiều giảm không?",
-            "Có Momo không?",
-        ];
-
-        await Contact.insertMany(
-            messages.map((msg, i) => ({
-                name: `Khách ${i + 1}`,
-                email: `khach${i + 1}@gmail.com`,
-                phone: `09${rand(10000000, 99999999)}`,
-                message: msg,
-                status: i % 2 === 0 ? "pending" : "replied",
-            }))
-        );
-
-        console.log("✅ SEED SUCCESS FULL DATA!");
+        console.log("✅ SEED SUCCESS FULL (PRODUCT + NEWS + SALE IMAGE)");
         process.exit();
     } catch (err) {
         console.error("❌ ERROR:", err);

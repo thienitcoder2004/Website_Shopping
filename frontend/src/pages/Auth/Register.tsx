@@ -28,6 +28,16 @@ export default function Register() {
     confirmPassword: "",
   });
 
+  // VALIDATE EMAIL
+  const isValidGmail = (email: string) => {
+    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+  };
+
+  // VALIDATE PASSWORD
+  const isValidPassword = (password: string) => {
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password);
+  };
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
@@ -51,22 +61,26 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
+    // EMAIL
+    if (!isValidGmail(form.email)) {
+      toast.error("Email phải là @gmail.com ❌");
+      return;
+    }
+
+    // PASSWORD RULE
+    if (!isValidPassword(form.password)) {
+      toast.error("Mật khẩu ≥6 ký tự, có chữ hoa, chữ thường và số ❌");
+      return;
+    }
+
+    // CONFIRM
     if (form.password !== form.confirmPassword) {
       toast.error("Mật khẩu không khớp ❌");
       return;
     }
 
     try {
-      await dispatch(
-        register({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
-          phone: form.phone,
-          password: form.password,
-          confirmPassword: form.confirmPassword,
-        }),
-      ).unwrap();
+      await dispatch(register(form)).unwrap();
 
       toast.success("Đăng ký thành công 🎉");
       navigate("/");
