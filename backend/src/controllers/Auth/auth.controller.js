@@ -4,36 +4,22 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 
-// GENERATE JWT TOKEN
+// VALIDATE
+const isValidGmail = (email) => {
+  return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+};
+
+const isValidPassword = (password) => {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/.test(password);
+};
+
+// GENERATE TOKEN
 const generateToken = (user) => {
   return jwt.sign(
     { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
+    process.env.JWT_SECRET || "secret123",
+    { expiresIn: process.env.JWT_EXPIRE || "7d" }
   );
-};
-
-const calculateAge = (dateOfBirth) => {
-  if (!dateOfBirth) return 0;
-
-  const today = new Date();
-  const dob = new Date(dateOfBirth);
-
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-
-  if (
-    monthDiff < 0 ||
-    (monthDiff === 0 && today.getDate() < dob.getDate())
-  ) {
-    age--;
-  }
-
-  return age;
-};
-
-const isAtLeast16 = (dateOfBirth) => {
-  return calculateAge(dateOfBirth) >= 16;
 };
 
 // REGISTER
@@ -45,10 +31,10 @@ exports.register = async (req, res) => {
       email,
       phone,
       password,
-      confirmPassword
+      confirmPassword,
     } = req.body;
 
-    // VALIDATE
+    // CHECK EMPTY
     if (
       !firstName ||
       !lastName ||
@@ -62,6 +48,21 @@ exports.register = async (req, res) => {
       });
     }
 
+    // EMAIL
+    if (!isValidGmail(email)) {
+      return res.status(400).json({
+        message: "Email phải là @gmail.com",
+      });
+    }
+
+    // PASSWORD RULE
+    if (!isValidPassword(password)) {
+      return res.status(400).json({
+        message: "Mật khẩu ≥6 ký tự, có chữ hoa, chữ thường và số",
+      });
+    }
+
+    // CONFIRM
     if (password !== confirmPassword) {
       return res.status(400).json({
         message: "Mật khẩu không khớp",
@@ -70,31 +71,45 @@ exports.register = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // CHECK EMAIL TỒN TẠI
     const exist = await User.findOne({ email: normalizedEmail });
     if (exist) {
-      return res.status(400).json({ message: "Email đã tồn tại" });
+      return res.status(400).json({
+        message: "Email đã tồn tại",
+      });
     }
 
-    const hashed = await bcrypt.hash(password, 12);
+    // HASH PASSWORD
+    const hashedPassword = await bcrypt.hash(password, 12);
 
+    // CREATE USER
     const user = await User.create({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: normalizedEmail,
       phone: phone.trim(),
-      password: hashed,
+      password: hashedPassword,
       role: "user",
       provider: "local",
     });
 
     return res.json({
-      message: "Đăng ký thành công",
+      message: "Đăng ký thành công 🎉",
       token: generateToken(user),
-      user: user,
+      user: {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+      },
     });
   } catch (err) {
     console.log("REGISTER ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -103,21 +118,31 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const normalizedEmail = String(email).toLowerCase().trim();
+    if (!isValidGmail(email)) {
+      return res.status(400).json({
+        message: "Email phải là @gmail.com",
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
 
     const user = await User.findOne({ email: normalizedEmail });
     if (!user) {
-      return res.status(400).json({ message: "Sai email" });
+      return res.status(400).json({
+        message: "Sai email",
+      });
     }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(400).json({ message: "Sai mật khẩu" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Sai mật khẩu",
+      });
     }
 
     if (!user.isActive) {
       return res.status(403).json({
-        message: "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên.",
+        message: "Tài khoản đã bị khóa",
       });
     }
 
@@ -130,16 +155,13 @@ exports.login = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
-        address: user.address,
-        avatar: user.avatar,
-        dateOfBirth: user.dateOfBirth,
-        gender: user.gender,
-        shoppingPreference: user.shoppingPreference,
       },
     });
   } catch (err) {
     console.log("LOGIN ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -150,85 +172,60 @@ exports.changePassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
 
     if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
-    }
-
-    if (!oldPassword || !newPassword) {
-      return res.status(400).json({
-        message: "Vui lòng nhập đầy đủ mật khẩu cũ và mật khẩu mới",
+      return res.status(404).json({
+        message: "Không tìm thấy user",
       });
     }
 
     const match = await bcrypt.compare(oldPassword, user.password);
     if (!match) {
-      return res.status(400).json({ message: "Sai mật khẩu cũ" });
+      return res.status(400).json({
+        message: "Sai mật khẩu cũ",
+      });
     }
 
     user.password = await bcrypt.hash(newPassword, 12);
     await user.save();
 
-    return res.json({ message: "Đổi mật khẩu thành công" });
+    return res.json({
+      message: "Đổi mật khẩu thành công",
+    });
   } catch (err) {
     console.log("CHANGE PASSWORD ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
-// SEND RESET EMAIL
-const sendResetEmail = async (email, token) => {
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  await transporter.verify();
-  console.log("SMTP READY");
-
-  const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Reset mật khẩu",
-    html: `
-      <h3>Reset mật khẩu</h3>
-      <p>Click link bên dưới để đổi mật khẩu:</p>
-      <a href="${resetLink}">${resetLink}</a>
-      <p>Link hết hạn sau 10 phút</p>
-    `,
-  });
-};
-
-// FORGOT PASSWORD
+//  FORGOT PASSWORD
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const normalizedEmail = String(email).toLowerCase().trim();
-
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      return res.status(400).json({ message: "Email không tồn tại" });
+      return res.status(400).json({
+        message: "Email không tồn tại",
+      });
     }
 
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    const token = crypto.randomBytes(32).toString("hex");
 
-    user.resetToken = resetToken;
+    user.resetToken = token;
     user.resetTokenExpire = Date.now() + 10 * 60 * 1000;
 
     await user.save();
 
-    await sendResetEmail(normalizedEmail, resetToken);
-
-    return res.json({ message: "Đã gửi email reset mật khẩu" });
+    return res.json({
+      message: "Token reset đã tạo (test)",
+      token,
+    });
   } catch (err) {
-    console.log("FORGOT PASSWORD ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    console.log("FORGOT ERROR:", err);
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -238,20 +235,18 @@ exports.resetPassword = async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
-    if (!password) {
-      return res.status(400).json({ message: "Vui lòng nhập mật khẩu mới" });
-    }
-
-    const user = await User.findOne({
-      resetToken: token,
-    });
+    const user = await User.findOne({ resetToken: token });
 
     if (!user) {
-      return res.status(400).json({ message: "Token không hợp lệ" });
+      return res.status(400).json({
+        message: "Token không hợp lệ",
+      });
     }
 
-    if (!user.resetTokenExpire || user.resetTokenExpire < Date.now()) {
-      return res.status(400).json({ message: "Token đã hết hạn" });
+    if (user.resetTokenExpire < Date.now()) {
+      return res.status(400).json({
+        message: "Token hết hạn",
+      });
     }
 
     user.password = await bcrypt.hash(password, 12);
@@ -260,9 +255,13 @@ exports.resetPassword = async (req, res) => {
 
     await user.save();
 
-    return res.json({ message: "Đổi mật khẩu thành công" });
+    return res.json({
+      message: "Reset mật khẩu thành công",
+    });
   } catch (err) {
     console.log("RESET ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };

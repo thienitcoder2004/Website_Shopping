@@ -219,7 +219,7 @@ export default function Header() {
 
           {/* NAM */}
           <div className="group relative">
-            <Link to="/category/nam" className={isPrefixActive("nam")}>
+            <Link to="/product/nam" className={isPrefixActive("nam")}>
               NAM
             </Link>
 
@@ -263,7 +263,7 @@ export default function Header() {
 
           {/* NỮ */}
           <div className="group relative">
-            <Link to="/category/nu" className={isPrefixActive("nu")}>
+            <Link to="/product/nu" className={isPrefixActive("nu")}>
               NỮ
             </Link>
 
@@ -305,7 +305,7 @@ export default function Header() {
             </div>
           </div>
 
-          <Link to="/category/phu-kien" className={isPrefixActive("phu-kien")}>
+          <Link to="/product/phu-kien" className={isPrefixActive("phu-kien")}>
             PHỤ KIỆN
           </Link>
 
@@ -330,13 +330,13 @@ export default function Header() {
             <Link to="/" onClick={() => setOpen(false)}>
               TRANG CHỦ
             </Link>
-            <Link to="/category/nam" onClick={() => setOpen(false)}>
+            <Link to="/product/nam" onClick={() => setOpen(false)}>
               NAM
             </Link>
-            <Link to="/category/nu" onClick={() => setOpen(false)}>
+            <Link to="/product/nu" onClick={() => setOpen(false)}>
               NỮ
             </Link>
-            <Link to="/category/phu-kien" onClick={() => setOpen(false)}>
+            <Link to="/product/phu-kien" onClick={() => setOpen(false)}>
               PHỤ KIỆN
             </Link>
             <Link to="/sale" onClick={() => setOpen(false)}>

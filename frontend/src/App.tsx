@@ -49,6 +49,7 @@ import ProductForm from "./pages/Admin/ProductForm";
 import OrdersPage from "./pages/Admin/OrdersPage";
 import ReviewsPage from "./pages/Admin/ReviewsPage";
 import StatisticsPage from "./pages/Admin/StatisticsPage";
+import SalePage from "./pages/User/Sales/SalePage";
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/search" element={<ProductList />} />
 
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/sale" element={<SalePage />} />
           <Route path="/cart" element={<ShoppingCart />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
