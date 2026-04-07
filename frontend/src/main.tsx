@@ -5,15 +5,12 @@ import { Provider } from "react-redux";
 import { store } from "./stores/store.ts";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { CartProvider } from "./context/cart.context.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <Provider store={store}>
-      <CartProvider>
-        <App />
-        <ToastContainer position="top-right" autoClose={2000} />
-      </CartProvider>
+      <App />
+      <ToastContainer position="top-right" autoClose={2000} />
     </Provider>
   </BrowserRouter>,
 );

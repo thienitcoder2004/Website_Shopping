@@ -1,8 +1,8 @@
-import AccessoriesSection from "../../components/productsections/AccessoriesSection";
-import BestSellerSection from "../../components/productsections/BestSellerSection";
-import CategoryProductSection from "../../components/productsections/CategoryProductSection";
-import Navbar from "../../components/common/Navbar";
-import NewsSection from "../../components/news/NewsSection";
+import AccessoriesSection from "../../components/AccessoriesSection";
+import BestSellerSection from "../../components/BestSellerSection";
+import CategoryProductSection from "../../components/CategoryProductSection";
+import Navbar from "../../components/Navbar";
+import NewsSection from "../../components/NewsSection";
 
 export function Home() {
   return (
